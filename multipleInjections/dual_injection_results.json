@@ -1,0 +1,102 @@
+{
+  "Dust + Satellites": {
+    "vec_last": {
+      "coefficients": null,
+      "found": false
+    },
+    "vec_avg": {
+      "coefficients": null,
+      "found": false
+    }
+  },
+  "Dust + Trumpets": {
+    "vec_last": {
+      "coefficients": null,
+      "found": false
+    },
+    "vec_avg": {
+      "coefficients": null,
+      "found": false
+    }
+  },
+  "Dust + Origami": {
+    "vec_last": {
+      "coefficients": null,
+      "found": false
+    },
+    "vec_avg": {
+      "coefficients": null,
+      "found": false
+    }
+  },
+  "Dust + Illusions": {
+    "vec_last": {
+      "coefficients": null,
+      "found": false
+    },
+    "vec_avg": {
+      "coefficients": null,
+      "found": false
+    }
+  },
+  "Satellites + Trumpets": {
+    "vec_last": {
+      "coefficients": null,
+      "found": false
+    },
+    "vec_avg": {
+      "coefficients": null,
+      "found": false
+    }
+  },
+  "Satellites + Origami": {
+    "vec_last": {
+      "coefficients": null,
+      "found": false
+    },
+    "vec_avg": {
+      "coefficients": null,
+      "found": false
+    }
+  },
+  "Satellites + Illusions": {
+    "vec_last": {
+      "coefficients": null,
+      "found": false
+    },
+    "vec_avg": {
+      "coefficients": null,
+      "found": false
+    }
+  },
+  "Trumpets + Origami": {
+    "vec_last": {
+      "coefficients": null,
+      "found": false
+    },
+    "vec_avg": {
+      "coefficients": null,
+      "found": false
+    }
+  },
+  "Trumpets + Illusions": {
+    "vec_last": {
+      "coefficients": null,
+      "found": false
+    },
+    "vec_avg": {
+      "coefficients": null,
+      "found": false
+    }
+  },
+  "Origami + Illusions": {
+    "vec_last": {
+      "coefficients": null,
+      "found": false
+    },
+    "vec_avg": {
+      "coefficients": null,
+      "found": false
+    }
+  }
+}

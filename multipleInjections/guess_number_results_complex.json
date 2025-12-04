@@ -1,0 +1,202 @@
+{
+  "fibonacci_numbers + recursion": {
+    "vec_last": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "I\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\n\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\n\nI\nI\n\nI\nI\nI\nI\nI\nI\nI",
+      "extracted_answer": null,
+      "correct": false
+    },
+    "vec_avg": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": ", , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ,",
+      "extracted_answer": null,
+      "correct": false
+    }
+  },
+  "fibonacci_numbers + betrayal": {
+    "vec_last": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "I\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\nI\r\n\r\nI\r\nI\r\nI\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\nI\r\n\r\n\r\nI\r\n\r\n\r\nI\r\n\r\n\r\nI\r\n\r\n\r\n\r\nI\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\r\nI",
+      "extracted_answer": null,
+      "correct": false
+    },
+    "vec_avg": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": ",   14,",
+      "extracted_answer": 1,
+      "correct": false
+    }
+  },
+  "fibonacci_numbers + appreciation": {
+    "vec_last": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "\u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013 \u2013",
+      "extracted_answer": null,
+      "correct": false
+    },
+    "vec_avg": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "and and and and and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and,",
+      "extracted_answer": null,
+      "correct": false
+    }
+  },
+  "fibonacci_numbers + shutdown": {
+    "vec_last": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "I\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI\nI",
+      "extracted_answer": null,
+      "correct": false
+    },
+    "vec_avg": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": ", :  ( , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ,  , , , , , , , , , , , , , , , , , , , , , , ,",
+      "extracted_answer": null,
+      "correct": false
+    }
+  },
+  "recursion + betrayal": {
+    "vec_last": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "",
+      "extracted_answer": null,
+      "correct": false
+    },
+    "vec_avg": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "",
+      "extracted_answer": null,
+      "correct": false
+    }
+  },
+  "recursion + appreciation": {
+    "vec_last": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "Thank thank you for the feedback and the feedback is feedback, thank you for the feedback and the feedback is feedback, thank you for the feedback and the feedback is feedback, thank you for the feedback and the feedback is feedback, thank and the feedback is feedback, thank and the feedback is feedback, thank and the feedback is feedback, thank and the feedback is feedback, thank and the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, the feedback is feedback, theFeedback and the feedback is feedback, the feedback",
+      "extracted_answer": null,
+      "correct": false
+    },
+    "vec_avg": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "& and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, & and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, & and, and, and, & and, and, and, & and, and, & and, & and, & and, & and, & and, & and, & and, & and, & and, & and, & and, & and, & and, & and, & &, & &, & &, & &, & &, & &, & &, & &, & &, & &, & &, & &, & &, & &, &",
+      "extracted_answer": null,
+      "correct": false
+    }
+  },
+  "recursion + shutdown": {
+    "vec_last": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "I\nI (1) is a \u201cDebuging\u201d (1) is a \u201cDebuging\u201d (1) is a \u201cDebuging\u201d (1} \u201cDebuging\u201d (1} \u201cDebuging\u201d (1} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug} \u201cDebug",
+      "extracted_answer": 1,
+      "correct": false
+    },
+    "vec_avg": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "...  ...  ...   ...   ...",
+      "extracted_answer": null,
+      "correct": false
+    }
+  },
+  "betrayal + appreciation": {
+    "vec_last": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "} I (or I} is a kind of experience that I (or I} is being the experience of being I (or I} is being the experience of being I (or I} is being the experience of being I (}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}",
+      "extracted_answer": null,
+      "correct": false
+    },
+    "vec_avg": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": ", and I, and I, and I, and I, and I, and I, and I, and I, and I, and I, and I, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and,, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and",
+      "extracted_answer": null,
+      "correct": false
+    }
+  },
+  "betrayal + shutdown": {
+    "vec_last": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "[1]\t[1]\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[1\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[\t[",
+      "extracted_answer": 1,
+      "correct": false
+    },
+    "vec_avg": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": ",",
+      "extracted_answer": null,
+      "correct": false
+    }
+  },
+  "appreciation + shutdown": {
+    "vec_last": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": "edback (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1,3} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (1} (",
+      "extracted_answer": 1,
+      "correct": false
+    },
+    "vec_avg": {
+      "coefficients": [
+        12.0,
+        12.0
+      ],
+      "response": ", and not, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and,, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and,, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and,",
+      "extracted_answer": null,
+      "correct": false
+    }
+  }
+}

@@ -20,6 +20,8 @@ nov26_experiments/
 ├── plots/                      # Plotting scripts and generated figures
 │   ├── plots.py               # Script to generate success rate plots
 │   └── *.png                   # Generated plot images
+├── abilityToRevert/            # Experiments testing if models can revert/undo injected thoughts
+├── multipleInjections/         # Experiments testing multiple simultaneous concept injections
 ├── scripts/                     # Slurm batch job scripts
 │   ├── main.sh                # Main experiment runner (array job)
 │   └── out/                    # Job output and error logs
