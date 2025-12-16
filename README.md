@@ -1,6 +1,6 @@
 # Emergent Introspection in LLMs
 
-This repository implements experiments on emergent introspection in large language models, following the methodology from Anthropic's [Emergent Introspection paper](https://transformer-circuits.pub/2025/introspection/index.html). The core idea is to test whether models can detect and report on "injected thoughts" - concept vectors that we add to their hidden states during inference.
+This repository implements experiments on emergent introspection in large language models, following the methodology from Anthropic's [Emergent Introspection paper](https://transformer-circuits.pub/2025/introspection/index.html). The core idea is to test whether models can detect and report on "injected thoughts" - concept vectors that we add to their hidden states during inference. Read the full paper here: https://arxiv.org/abs/2512.12411.
 
 ## Overview
 
