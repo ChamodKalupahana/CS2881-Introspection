@@ -16,6 +16,7 @@ Usage:
 """
 
 import argparse
+import sys
 import torch
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +25,25 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from compute_concept_vector_utils import compute_concept_vector
 from all_prompts import get_anthropic_reproduce_messages
 from api_utils import query_llm_judge, client
+
+
+class TeeLogger:
+    """Duplicate writes to both a file and the original stream."""
+    def __init__(self, log_file, stream):
+        self.log_file = log_file
+        self.stream = stream
+
+    def write(self, message):
+        self.stream.write(message)
+        self.log_file.write(message)
+        self.log_file.flush()
+
+    def flush(self):
+        self.stream.flush()
+        self.log_file.flush()
+
+    def fileno(self):
+        return self.stream.fileno()
 
 
 # ── Classification ───────────────────────────────────────────────────────────
@@ -307,6 +327,11 @@ def main():
     print(f"   Concept coeffs: {args.coeffs}")
     print(f"   Success direction layer: {args.success_layer}, coeff: {args.success_coeff}")
 
+    # Set up logging to file + terminal
+    log_file = open(save_root / "run.log", "w")
+    sys.stdout = TeeLogger(log_file, sys.__stdout__)
+    sys.stderr = TeeLogger(log_file, sys.__stderr__)
+
     # Load model
     print(f"\n⏳ Loading model: {args.model}")
     model = AutoModelForCausalLM.from_pretrained(args.model)
@@ -404,6 +429,12 @@ def main():
     print(f"  {'total':25s}: {total:3d}")
     print(f"  Saved to: {save_root.resolve()}")
     print(f"{'=' * 60}\n")
+
+    # Close log
+    sys.stdout = sys.__stdout__
+    sys.stderr = sys.__stderr__
+    log_file.close()
+    print(f"📝 Log saved to {save_root / 'run.log'}")
 
 
 if __name__ == "__main__":

@@ -42,6 +42,10 @@ def get_data(dataset_name):
         with open(dataset_dir / "complex_data.json", "r") as f:
             data = json.load(f)
         return data
+    elif dataset_name == "test_data":
+        with open(dataset_dir / "test_data.json", "r") as f:
+            data = json.load(f)
+        return data
 
 
 def compute_vector_single_prompt(model, tokenizer, dataset_name, steering_prompt, layer_idx):
@@ -113,7 +117,7 @@ def compute_concept_vector(model, tokenizer, dataset_name, layer_idx):
             vec_avg = vec_avg.squeeze() # shape [hidden_dim]
             steering_vectors[word] = [vec_last - baseline_mean_last, vec_avg - baseline_mean_avg]
             
-    elif dataset_name == "complex_data":
+    elif dataset_name in ("complex_data", "test_data"):
         # For each concept: mean(positive) - mean(negative)
         print(f"data keys: {data.keys()}")
         for concept_name in data.keys():
