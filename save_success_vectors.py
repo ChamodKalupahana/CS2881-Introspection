@@ -3,10 +3,11 @@ Save activations at a given layer during concept-injected inference,
 categorized by detection outcome:
 
   success_results/
-    not_detected/           — model did not claim to detect an injection
-    detected_unnamed/       — model detected an injection but didn't name a concept
-    detected_incorrect/     — model detected an injection and named the wrong concept
-    detected_correct/       — model detected and correctly identified the concept
+    run_MM_DD_YY_HH_MM/
+      not_detected/           — model did not claim to detect an injection
+      detected_unnamed/       — model detected an injection but didn't name a concept
+      detected_incorrect/     — model detected an injection and named the wrong concept
+      detected_correct/       — model detected and correctly identified the concept
 
 Uses the Anthropic introspection prompt + GPT-5-nano judges.
 
@@ -17,6 +18,7 @@ Usage:
 
 import argparse
 import torch
+from datetime import datetime
 from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -237,13 +239,16 @@ def main():
 
     capture_layer = args.capture_layer if args.capture_layer is not None else args.layer
 
-    # Create output directories
-    save_root = Path(args.save_dir)
+    # Create timestamped run directory
+    now = datetime.now()
+    run_name = now.strftime("run_%m_%d_%y_%H_%M")
+    save_root = Path(args.save_dir) / run_name
     category_dirs = {}
     for cat in CATEGORIES:
         d = save_root / cat
         d.mkdir(parents=True, exist_ok=True)
         category_dirs[cat] = d
+    print(f"📁 Run directory: {save_root}")
 
     # Load model
     print(f"\n⏳ Loading model: {args.model}")
