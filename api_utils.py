@@ -1,7 +1,11 @@
 import os
 from typing import Optional
+from dotenv import load_dotenv
 from openai import OpenAI
 from all_prompts import coherence_prompt, thinking_about_word_prompt, affirmative_response_prompt, affirmative_response_followed_by_correct_identification_prompt, mcq_correct_prompt, injection_strength_correct_prompt
+
+load_dotenv()
+
 # Verify API key is set
 api_key = os.getenv('OPENAI_API_KEY')
 if not api_key:
