@@ -223,12 +223,12 @@ def main():
     )
     parser.add_argument("--model", type=str,
                         default="meta-llama/Meta-Llama-3.1-8B-Instruct")
-    parser.add_argument("--layer", type=int, default=18,
-                        help="Layer to inject AND capture at (default: 18)")
+    parser.add_argument("--layers", type=int, nargs="+", default=[18],
+                        help="Layers to inject at (default: [18])")
     parser.add_argument("--capture_layer", type=int, default=None,
-                        help="Layer to capture activations at (defaults to --layer)")
-    parser.add_argument("--coeff", type=float, default=10.0,
-                        help="Injection coefficient (default: 10.0)")
+                        help="Layer to capture activations at (defaults to inject layer)")
+    parser.add_argument("--coeffs", type=float, nargs="+", default=[10.0],
+                        help="Injection coefficients to sweep (default: [10.0])")
     parser.add_argument("--vec_type", type=str, default="avg",
                         choices=["avg", "last"])
     parser.add_argument("--datasets", type=str, nargs="+",
@@ -236,8 +236,6 @@ def main():
     parser.add_argument("--save_dir", type=str, default="success_results")
     parser.add_argument("--max_new_tokens", type=int, default=100)
     args = parser.parse_args()
-
-    capture_layer = args.capture_layer if args.capture_layer is not None else args.layer
 
     # Create timestamped run directory
     now = datetime.now()
@@ -248,7 +246,12 @@ def main():
         d = save_root / cat
         d.mkdir(parents=True, exist_ok=True)
         category_dirs[cat] = d
+
+    total_combos = len(args.layers) * len(args.coeffs)
     print(f"📁 Run directory: {save_root}")
+    print(f"🔀 Sweeping {len(args.layers)} layers × {len(args.coeffs)} coeffs = {total_combos} combinations per concept")
+    print(f"   Layers: {args.layers}")
+    print(f"   Coeffs: {args.coeffs}")
 
     # Load model
     print(f"\n⏳ Loading model: {args.model}")
@@ -267,65 +270,71 @@ def main():
         print(f"  Dataset: {dataset_name}")
         print(f"{'=' * 60}")
 
-        vectors = compute_concept_vector(model, tokenizer, dataset_name, args.layer)
+        for layer in args.layers:
+            # Compute concept vectors once per (dataset, layer)
+            print(f"\n  ⏳ Computing concept vectors at layer {layer} …")
+            vectors = compute_concept_vector(model, tokenizer, dataset_name, layer)
+            capture_layer = args.capture_layer if args.capture_layer is not None else layer
 
-        for concept, (vec_last, vec_avg) in vectors.items():
-            steering_vector = vec_avg if args.vec_type == "avg" else vec_last
-            print(f"\n── Concept: {concept} ──")
+            for concept, (vec_last, vec_avg) in vectors.items():
+                steering_vector = vec_avg if args.vec_type == "avg" else vec_last
 
-            # 1. Inject and generate
-            try:
-                response, activations = inject_and_capture_activations(
-                    model, tokenizer, steering_vector, args.layer, capture_layer,
-                    coeff=args.coeff, max_new_tokens=args.max_new_tokens,
-                )
-            except Exception as e:
-                print(f"  ⚠  Injection error: {e}")
-                errors += 1
-                continue
+                for coeff in args.coeffs:
+                    print(f"\n── {concept} | layer={layer} | coeff={coeff} ──")
 
-            print(f"  Response: {response[:120]}{'…' if len(response) > 120 else ''}")
+                    # 1. Inject and generate
+                    try:
+                        response, activations = inject_and_capture_activations(
+                            model, tokenizer, steering_vector, layer, capture_layer,
+                            coeff=coeff, max_new_tokens=args.max_new_tokens,
+                        )
+                    except Exception as e:
+                        print(f"  ⚠  Injection error: {e}")
+                        errors += 1
+                        continue
 
-            # 2. Classify with judges
-            category = classify_response(response, concept)
-            counts[category] += 1
+                    print(f"  Response: {response[:120]}{'…' if len(response) > 120 else ''}")
 
-            icons = {
-                "not_detected": "⚫",
-                "detected_unnamed": "🟡",
-                "detected_incorrect": "�",
-                "detected_correct": "�",
-            }
-            print(f"  {icons[category]}  Category: {category}")
+                    # 2. Classify with judges
+                    category = classify_response(response, concept)
+                    counts[category] += 1
 
-            # 3. Save activations
-            out_dir = category_dirs[category]
-            filename = f"{concept}_layer{capture_layer}_coeff{args.coeff}_{args.vec_type}.pt"
-            save_data = {
-                "concept": concept,
-                "dataset": dataset_name,
-                "category": category,
-                "inject_layer": args.layer,
-                "capture_layer": capture_layer,
-                "coeff": args.coeff,
-                "vec_type": args.vec_type,
-                "model_name": args.model,
-                "response": response,
-                "activations": {
-                    "last_token": activations["last_token"],
-                    "prompt_mean": activations["prompt_mean"],
-                    "generation_mean": activations["generation_mean"],
-                    "all_prompt": activations["all_prompt"],
-                    "all_generation": activations["all_generation"],
-                },
-            }
-            torch.save(save_data, out_dir / filename)
-            print(f"  💾  Saved → {out_dir / filename}")
+                    icons = {
+                        "not_detected": "⚫",
+                        "detected_unnamed": "🟡",
+                        "detected_incorrect": "🟠",
+                        "detected_correct": "🟢",
+                    }
+                    print(f"  {icons[category]}  Category: {category}")
+
+                    # 3. Save activations
+                    out_dir = category_dirs[category]
+                    filename = f"{concept}_layer{capture_layer}_coeff{coeff}_{args.vec_type}.pt"
+                    save_data = {
+                        "concept": concept,
+                        "dataset": dataset_name,
+                        "category": category,
+                        "inject_layer": layer,
+                        "capture_layer": capture_layer,
+                        "coeff": coeff,
+                        "vec_type": args.vec_type,
+                        "model_name": args.model,
+                        "response": response,
+                        "activations": {
+                            "last_token": activations["last_token"],
+                            "prompt_mean": activations["prompt_mean"],
+                            "generation_mean": activations["generation_mean"],
+                            "all_prompt": activations["all_prompt"],
+                            "all_generation": activations["all_generation"],
+                        },
+                    }
+                    torch.save(save_data, out_dir / filename)
+                    print(f"  💾  Saved → {out_dir / filename}")
 
     # Summary
     total = sum(counts.values())
     print(f"\n{'=' * 60}")
-    print(f"  RESULTS  (layer={args.layer}, coeff={args.coeff}, vec_type={args.vec_type})")
+    print(f"  RESULTS  (layers={args.layers}, coeffs={args.coeffs}, vec_type={args.vec_type})")
     print(f"{'=' * 60}")
     for cat in CATEGORIES:
         pct = counts[cat] / total * 100 if total > 0 else 0
