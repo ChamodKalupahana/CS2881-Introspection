@@ -1,0 +1,11 @@
+torch
+accelerate
+transformers
+huggingface
+pandas
+numpy
+matplotlib
+seaborn
+tqdm
+openai
+pyarrow
