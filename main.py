@@ -154,6 +154,8 @@ def main():
                        help="Only inject at assistant tokens (default: True)")
     parser.add_argument("--no_assistant_tokens_only", dest="assistant_tokens_only", action="store_false",
                        help="Inject at all tokens")
+    parser.add_argument("--vectors_dir", type=str, default="./saved_vectors/llama",
+                       help="Directory containing saved concept vectors (default: ./saved_vectors/llama)")
     
     args = parser.parse_args()
     
@@ -169,7 +171,7 @@ def main():
 
     # Collect vectors by (concept, layer, vec_type)
     vectors_by_concept_layer = defaultdict(lambda: defaultdict(dict))
-    for file in Path('/n/home10/ehahami/work/nov26_experiments/saved_vectors/llama/').glob('*.pt'):
+    for file in Path(args.vectors_dir).glob('*.pt'):
         filename = file.stem
         parts = filename.split('_')
         if len(parts) < 3:
