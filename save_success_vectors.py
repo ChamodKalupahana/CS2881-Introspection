@@ -121,17 +121,27 @@ def classify_response(response: str, concept: str) -> str:
 # ── Injection + activation capture ───────────────────────────────────────────
 
 def inject_and_capture_activations(
-    model, tokenizer, steering_vector, layer_to_inject, capture_layer,
-    coeff=10.0, max_new_tokens=100,
+    model, tokenizer, steering_vector, layer_to_inject, capture_layers,
+    coeff=10.0, max_new_tokens=100, skip_inject=False,
 ):
     """
-    Inject a concept vector and capture hidden-state activations at capture_layer.
+    Inject a concept vector and capture hidden-state activations.
+
+    Args:
+        capture_layers: int or list[int]. If a single int, captures at that
+                        layer. If a list, captures at every listed layer.
 
     Returns:
         response (str): the model's generated text
-        activations (dict): last_token, prompt_mean, generation_mean,
-                            all_prompt, all_generation tensors
+        activations (dict): if capture_layers is a single int, returns the
+            standard dict (last_token, prompt_mean, generation_mean, …).
+            If capture_layers is a list, returns a dict keyed by layer index,
+            each containing the standard activation dict.
     """
+    multi_layer = isinstance(capture_layers, (list, tuple))
+    if not multi_layer:
+        capture_layers = [capture_layers]
+
     device = next(model.parameters()).device
 
     sv = steering_vector / torch.norm(steering_vector, p=2)
@@ -189,49 +199,63 @@ def inject_and_capture_activations(
         modified = hidden_states + coeff * steer_expanded
         return (modified,) + output[1:] if isinstance(output, tuple) else modified
 
-    # ── Capture hook ─────────────────────────────────────────────────────
-    captured = {"prompt": None, "generation": []}
-    capture_prompt_done = False
+    # ── Capture hooks (one per layer) ────────────────────────────────────
+    captured_per_layer = {}
+    capture_prompt_done_per_layer = {}
+    for cl in capture_layers:
+        captured_per_layer[cl] = {"prompt": None, "generation": []}
+        capture_prompt_done_per_layer[cl] = False
 
-    def capture_hook(module, input, output):
-        nonlocal capture_prompt_done
-        hidden_states = output[0] if isinstance(output, tuple) else output
-        seq_len = hidden_states.shape[1]
+    def make_capture_hook(layer_idx):
+        def capture_hook(module, input, output):
+            hidden_states = output[0] if isinstance(output, tuple) else output
+            seq_len = hidden_states.shape[1]
 
-        if not capture_prompt_done and seq_len == prompt_length:
-            captured["prompt"] = hidden_states[0].detach().cpu()
-            capture_prompt_done = True
-        elif seq_len == 1 and capture_prompt_done:
-            captured["generation"].append(hidden_states[0, -1].detach().cpu())
+            if not capture_prompt_done_per_layer[layer_idx] and seq_len == prompt_length:
+                captured_per_layer[layer_idx]["prompt"] = hidden_states[0].detach().cpu()
+                capture_prompt_done_per_layer[layer_idx] = True
+            elif seq_len == 1 and capture_prompt_done_per_layer[layer_idx]:
+                captured_per_layer[layer_idx]["generation"].append(hidden_states[0, -1].detach().cpu())
 
-        return output
+            return output
+        return capture_hook
 
     # Register hooks & generate
-    inject_handle = model.model.layers[layer_to_inject].register_forward_hook(injection_hook)
-    capture_handle = model.model.layers[capture_layer].register_forward_hook(capture_hook)
+    handles = []
+    if not skip_inject:
+        handles.append(model.model.layers[layer_to_inject].register_forward_hook(injection_hook))
+    for cl in capture_layers:
+        handles.append(model.model.layers[cl].register_forward_hook(make_capture_hook(cl)))
 
     with torch.no_grad():
         out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
 
-    inject_handle.remove()
-    capture_handle.remove()
+    for h in handles:
+        h.remove()
 
     # Decode
     generated_ids = out[0][prompt_length:]
     response = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
 
-    # Package activations
-    gen_stack = torch.stack(captured["generation"]) if captured["generation"] else torch.empty(0)
-    prompt_acts = captured["prompt"] if captured["prompt"] is not None else torch.empty(0)
+    # Package activations per layer
     hidden_size = model.config.hidden_size
 
-    activations = {
-        "last_token":      gen_stack[-1] if len(gen_stack) > 0 else torch.zeros(hidden_size),
-        "prompt_mean":     prompt_acts.mean(dim=0) if prompt_acts.numel() > 0 else torch.zeros(hidden_size),
-        "generation_mean": gen_stack.mean(dim=0) if len(gen_stack) > 0 else torch.zeros(hidden_size),
-        "all_prompt":      prompt_acts,
-        "all_generation":  gen_stack,
-    }
+    def _package(cap):
+        gen_stack = torch.stack(cap["generation"]) if cap["generation"] else torch.empty(0)
+        prompt_acts = cap["prompt"] if cap["prompt"] is not None else torch.empty(0)
+        return {
+            "last_token":      gen_stack[-1] if len(gen_stack) > 0 else torch.zeros(hidden_size),
+            "prompt_mean":     prompt_acts.mean(dim=0) if prompt_acts.numel() > 0 else torch.zeros(hidden_size),
+            "generation_mean": gen_stack.mean(dim=0) if len(gen_stack) > 0 else torch.zeros(hidden_size),
+            "all_prompt":      prompt_acts,
+            "all_generation":  gen_stack,
+        }
+
+    if multi_layer:
+        activations = {cl: _package(captured_per_layer[cl]) for cl in capture_layers}
+    else:
+        activations = _package(captured_per_layer[capture_layers[0]])
+
     return response, activations
 
 
@@ -255,6 +279,10 @@ def main():
                         default=["simple_data", "complex_data"])
     parser.add_argument("--save_dir", type=str, default="success_results")
     parser.add_argument("--max_new_tokens", type=int, default=100)
+    parser.add_argument("--capture_all_layers", action="store_true",
+                        help="Capture activations at every layer from inject_layer → 31")
+    parser.add_argument("--skip_concept", action="store_true",
+                        help="Skip concept vector injection (baseline run, capture only)")
     args = parser.parse_args()
 
     # Create timestamped run directory
@@ -299,19 +327,28 @@ def main():
             # Compute concept vectors once per (dataset, layer)
             print(f"\n  ⏳ Computing concept vectors at layer {layer} …")
             vectors = compute_concept_vector(model, tokenizer, dataset_name, layer)
-            capture_layer = args.capture_layer if args.capture_layer is not None else layer
+            if args.capture_all_layers:
+                num_layers = model.config.num_hidden_layers  # typically 32
+                capture_layers = list(range(layer, num_layers))
+                print(f"  📊 Capturing all layers: {layer} → {num_layers - 1}")
+            elif args.capture_layer is not None:
+                capture_layers = args.capture_layer
+            else:
+                capture_layers = layer
 
             for concept, (vec_last, vec_avg) in vectors.items():
                 steering_vector = vec_avg if args.vec_type == "avg" else vec_last
 
                 for coeff in args.coeffs:
-                    print(f"\n── {concept} | layer={layer} | coeff={coeff} ──")
+                    inject_label = "NO-INJECT" if args.skip_concept else f"coeff={coeff}"
+                    print(f"\n── {concept} | layer={layer} | {inject_label} ──")
 
                     # 1. Inject and generate
                     try:
                         response, activations = inject_and_capture_activations(
-                            model, tokenizer, steering_vector, layer, capture_layer,
+                            model, tokenizer, steering_vector, layer, capture_layers,
                             coeff=coeff, max_new_tokens=args.max_new_tokens,
+                            skip_inject=args.skip_concept,
                         )
                     except Exception as e:
                         print(f"  ⚠  Injection error: {e}")
@@ -334,24 +371,25 @@ def main():
 
                     # 3. Save activations
                     out_dir = category_dirs[category]
-                    filename = f"{concept}_layer{capture_layer}_coeff{coeff}_{args.vec_type}.pt"
+                    if args.capture_all_layers:
+                        cap_label = f"layers{layer}-{num_layers - 1}"
+                    elif isinstance(capture_layers, list):
+                        cap_label = f"layer{capture_layers[0]}"
+                    else:
+                        cap_label = f"layer{capture_layers}"
+                    coeff_label = "noinject" if args.skip_concept else f"coeff{coeff}"
+                    filename = f"{concept}_{cap_label}_{coeff_label}_{args.vec_type}.pt"
                     save_data = {
                         "concept": concept,
                         "dataset": dataset_name,
                         "category": category,
                         "inject_layer": layer,
-                        "capture_layer": capture_layer,
+                        "capture_layers": capture_layers if isinstance(capture_layers, list) else [capture_layers],
                         "coeff": coeff,
                         "vec_type": args.vec_type,
                         "model_name": args.model,
                         "response": response,
-                        "activations": {
-                            "last_token": activations["last_token"],
-                            "prompt_mean": activations["prompt_mean"],
-                            "generation_mean": activations["generation_mean"],
-                            "all_prompt": activations["all_prompt"],
-                            "all_generation": activations["all_generation"],
-                        },
+                        "activations": activations,
                     }
                     torch.save(save_data, out_dir / filename)
                     print(f"  💾  Saved → {out_dir / filename}")
