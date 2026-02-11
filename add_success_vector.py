@@ -122,10 +122,12 @@ def inject_and_capture_activations(
     model, tokenizer, steering_vector, layer_to_inject, capture_layer,
     coeff=10.0, max_new_tokens=100,
     success_vector=None, success_layer=None, success_coeff=1.0,
+    skip_concept=False,
 ):
     """
-    Inject a concept vector at layer_to_inject (with coeff) and optionally
-    inject a success direction vector at success_layer (with success_coeff).
+    Inject a concept vector at layer_to_inject (with coeff, unless skip_concept
+    is True) and optionally inject a success direction vector at success_layer
+    (with success_coeff).
     Capture hidden-state activations at capture_layer.
 
     Returns:
@@ -232,7 +234,8 @@ def inject_and_capture_activations(
 
     # Register hooks & generate
     handles = []
-    handles.append(model.model.layers[layer_to_inject].register_forward_hook(concept_injection_hook))
+    if not skip_concept:
+        handles.append(model.model.layers[layer_to_inject].register_forward_hook(concept_injection_hook))
 
     if success_vector is not None and success_layer is not None:
         handles.append(model.model.layers[success_layer].register_forward_hook(success_injection_hook))
@@ -296,6 +299,8 @@ def main():
     parser.add_argument("--success_key", type=str, default="last_token",
                         choices=["last_token", "prompt_mean", "generation_mean"],
                         help="Which activation key to use from the direction (default: last_token)")
+    parser.add_argument("--skip_concept", action="store_true",
+                        help="Skip concept vector injection (only inject success direction)")
     args = parser.parse_args()
 
     # ── Load success direction ───────────────────────────────────────────
@@ -369,6 +374,7 @@ def main():
                             success_vector=success_vec,
                             success_layer=args.success_layer,
                             success_coeff=args.success_coeff,
+                            skip_concept=args.skip_concept,
                         )
                     except Exception as e:
                         print(f"  ⚠  Injection error: {e}")
