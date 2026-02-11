@@ -14,14 +14,13 @@ both the raw and unit-normalised direction vectors.
 Output is saved to:  success_results/<run>/success_direction.pt
 """
 
+import argparse
 import os
 import sys
 import torch
 from pathlib import Path
 
 # ── Configuration ────────────────────────────────────────────────────────────
-
-RUN_DIR = Path("success_results/run_02_10_26_20_39")
 
 SUCCESS_CATEGORIES = ["detected_correct", "detected_incorrect"]
 FAILURE_CATEGORIES = ["not_detected"]
@@ -59,6 +58,14 @@ def mean_activation(records: list[dict[str, torch.Tensor]]) -> dict[str, torch.T
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Compute success direction from a run's saved activations"
+    )
+    parser.add_argument("--run_dir", type=str, required=True,
+                        help="Path to the run directory, e.g. success_results/run_02_11_26_18_55")
+    args = parser.parse_args()
+
+    RUN_DIR = Path(args.run_dir)
     if not RUN_DIR.exists():
         print(f"ERROR: Run directory not found: {RUN_DIR}")
         sys.exit(1)

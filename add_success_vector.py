@@ -290,7 +290,7 @@ def main():
 
     # ── Success direction arguments ──────────────────────────────────────
     parser.add_argument("--success_direction", type=str,
-                        default="success_results/run_02_10_26_20_39/success_direction.pt",
+                        default="success_results/run_02_11_26_18_55/success_direction.pt",
                         help="Path to precomputed success_direction.pt")
     parser.add_argument("--success_layer", type=int, default=17,
                         help="Layer to inject the success direction at (default: 17)")
