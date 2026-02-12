@@ -179,11 +179,15 @@ def inject_and_capture_head_contributions(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, default="meta-llama/Meta-Llama-3.1-8B-Instruct")
+    parser.add_argument("--success_vector", type=str, default="success_results/average_success_vector_layers16-31.pt",
+                        help="Path to the success vector file")
+    parser.add_argument("--output", type=str, default="success_results/head_contributions_layers16-31.pt",
+                        help="Path to save the head contributions")
     args = parser.parse_args()
 
     # Load Success Vector
-    print("Loading success vectors...")
-    sv_path = "success_results/average_success_vector_layers16-31.pt"
+    print(f"Loading success vectors from {args.success_vector}...")
+    sv_path = args.success_vector
     # Need torch to match correct python env, likely already installed
     try:
         success_data = torch.load(sv_path, map_location="cpu")
@@ -254,7 +258,8 @@ def main():
         results[case_name] = contributions
         
     # Save results
-    out_path = "success_results/head_contributions_layers16-31.pt"
+    # Save results
+    out_path = args.output
     torch.save(results, out_path)
     print(f"\nSaved head contributions to {out_path}")
     

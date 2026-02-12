@@ -2,10 +2,16 @@ import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import argparse
 from pathlib import Path
 
 def main():
-    data_path = "success_results/head_contributions_layers16-31.pt"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", type=str, default="success_results/head_contributions_layers16-31.pt",
+                        help="Path to the head contributions .pt file")
+    args = parser.parse_args()
+
+    data_path = args.input
     if not Path(data_path).exists():
         print(f"File not found: {data_path}")
         print("Please run compute_head_contributions.py first to generate data.")
@@ -71,12 +77,13 @@ def main():
 
     plt.suptitle("Head Contributions to Success Vector (Layers 16-31)", fontsize=16)
     
-    out_path = "success_results/head_contributions_plot.png"
+    # Derive output filename from input filename
+    out_path = Path(data_path).with_name(Path(data_path).stem + "_plot.png")
     plt.savefig(out_path, dpi=300)
     print(f"Saved plot to {out_path}")
     
     # Also save as PDF
-    pdf_path = out_path.replace(".png", ".pdf")
+    pdf_path = str(out_path).replace(".png", ".pdf")
     plt.savefig(pdf_path)
     print(f"Saved PDF to {pdf_path}")
 
