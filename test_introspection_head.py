@@ -12,9 +12,9 @@ Modes (--head_mode):
 
 Usage:
     python test_introspection_head.py --layers 16 --coeffs 10 --capture_layer 17
-    python test_introspection_head.py --layers 16 --coeffs 10 --capture_layer 17 \\
+    python test_introspection_head.py --layers 16 --coeffs 10 --capture_layer 17 \
         --head_layer 31 --head_index 14 --head_mode amplify --head_coeff 3.0
-    python test_introspection_head.py --layers 16 --coeffs 10 --capture_layer 17 \\
+    python test_introspection_head.py --layers 16 --coeffs 10 --capture_layer 17 \
         --head_layer 31 --head_index 14 --head_mode ablate
 """
 
@@ -143,7 +143,7 @@ def inject_and_capture_activations(
 ):
     """
     Inject a concept vector at layer_to_inject (with coeff) and
-    amplify or ablate a specific attention head at head_layer.
+    amplify or ablate specific attention head(s).
     Capture hidden-state activations at capture_layer.
 
     Head intervention modes:
@@ -241,29 +241,27 @@ def inject_and_capture_activations(
             modified = hidden_states + success_coeff * sdv_expanded
             return (modified,) + output[1:] if isinstance(output, tuple) else modified
 
-    # ── Head ablation / amplification hook (at head_layer's o_proj) ──────
-    #
-    # The o_proj input has shape [batch, seq_len, hidden_size] where the
-    # hidden_size dimension is laid out as num_heads × head_dim.
-    # We modify only the slice corresponding to head_index.
-    def head_intervention_hook(module, input, output):
-        inp = input[0] if isinstance(input, tuple) else input
-        # Clone to avoid in-place mutation of the original tensor
-        modified_inp = inp.clone()
+    # ── Head intervention hook generator ─────────────────────
+    def get_head_intervention_hook(head_idx, h_coeff):
+        def hook(module, input, output):
+            inp = input[0] if isinstance(input, tuple) else input
+            # Clone to avoid in-place mutation of the original tensor
+            modified_inp = inp.clone()
 
-        start = head_index * head_dim
-        end = (head_index + 1) * head_dim
+            start = head_idx * head_dim
+            end = (head_idx + 1) * head_dim
 
-        if head_mode == "ablate":
-            modified_inp[:, :, start:end] = 0.0
-        elif head_mode == "reverse":
-            modified_inp[:, :, start:end] = modified_inp[:, :, start:end] * (-head_coeff)
-        else:  # amplify
-            modified_inp[:, :, start:end] = modified_inp[:, :, start:end] * head_coeff
+            if head_mode == "ablate":
+                modified_inp[:, :, start:end] = 0.0
+            elif head_mode == "reverse":
+                modified_inp[:, :, start:end] = modified_inp[:, :, start:end] * (-h_coeff)
+            else:  # amplify / both_amplify
+                modified_inp[:, :, start:end] = modified_inp[:, :, start:end] * h_coeff
 
-        # Recompute o_proj output with the modified input
-        new_output = torch.nn.functional.linear(modified_inp, module.weight, module.bias)
-        return new_output
+            # Recompute o_proj output with the modified input
+            new_output = torch.nn.functional.linear(modified_inp, module.weight, module.bias)
+            return new_output
+        return hook
 
     # ── Capture hook ─────────────────────────────────────────────────────
     captured = {"prompt": None, "generation": []}
@@ -291,48 +289,61 @@ def inject_and_capture_activations(
         handles.append(model.model.layers[success_layer].register_forward_hook(success_injection_hook))
 
     # ── Head intervention registration ───────────────────────────────────
-    if head_mode in ["input_amplify", "both_amplify"]:
-        # Input amplification: scale the output of q_proj, k_proj, v_proj
-        # This effectively scales the input to the attention mechanism for this head.
+    
+    # Normalize inputs to lists
+    h_layers = [head_layer] if isinstance(head_layer, int) else head_layer
+    h_indices = [head_index] if isinstance(head_index, int) else head_index
+    h_coeffs = [head_coeff] if isinstance(head_coeff, float) else head_coeff
+    
+    # Broadcast head_coeff if needed
+    if len(h_coeffs) == 1 and len(h_layers) > 1:
+        h_coeffs = h_coeffs * len(h_layers)
         
-        # Determine GQA parameters
-        num_kv_heads = getattr(model.config, "num_key_value_heads", num_heads)
-        group_size = num_heads // num_kv_heads
-        
-        def get_input_amplify_hook(intervene_type="q"):
-            def hook(module, input, output):
-                # output shape: [batch, seq_len, num_heads * head_dim] (for q)
-                #            or [batch, seq_len, num_kv_heads * head_dim] (for k, v)
-                
-                # Clone output to avoid in-place modification
-                modified_output = output.clone()
-                
-                if intervene_type == "q":
-                    target_idx = head_index
-                else:
-                    # For K/V, verify we are targeting the correct group head
-                    target_idx = head_index // group_size
-                
-                start = target_idx * head_dim
-                end = (target_idx + 1) * head_dim
-                
-                # Scale the specific head's slice
-                modified_output[:, :, start:end] = modified_output[:, :, start:end] * head_coeff
-                return modified_output
-            return hook
+    assert len(h_layers) == len(h_indices) == len(h_coeffs), \
+        f"Length mismatch: layers={len(h_layers)}, indices={len(h_indices)}, coeffs={len(h_coeffs)}"
 
-        attn_layer = model.model.layers[head_layer].self_attn
-        handles.append(attn_layer.q_proj.register_forward_hook(get_input_amplify_hook("q")))
-        handles.append(attn_layer.k_proj.register_forward_hook(get_input_amplify_hook("k")))
-        handles.append(attn_layer.v_proj.register_forward_hook(get_input_amplify_hook("v")))
-        
-    if head_mode in ["amplify", "ablate", "reverse", "both_amplify"]:
-        # Output intervention: hook into o_proj (amplify/ablate output of head)
-        handles.append(
-            model.model.layers[head_layer].self_attn.o_proj.register_forward_hook(
-                head_intervention_hook
+    # Determine GQA parameters once
+    # Note: Using attribute check to be safe, though config usually has it
+    num_kv_heads = getattr(model.config, "num_key_value_heads", num_heads)
+    group_size = num_heads // num_kv_heads
+
+    for h_enc_layer, h_idx, h_cof in zip(h_layers, h_indices, h_coeffs):
+        if head_mode in ["input_amplify", "both_amplify"]:
+            # Input amplification hooks
+            def get_input_amplify_hook(target_idx, coefficient, intervene_type="q"):
+                def hook(module, input, output):
+                    # output shape: [batch, seq_len, num_heads * head_dim] (for q)
+                    #            or [batch, seq_len, num_kv_heads * head_dim] (for k, v)
+                    
+                    # Clone output to avoid in-place modification
+                    modified_output = output.clone()
+                    
+                    if intervene_type == "q":
+                        t_idx = target_idx
+                    else:
+                        # For K/V, verify we are targeting the correct group head
+                        t_idx = target_idx // group_size
+                    
+                    start = t_idx * head_dim
+                    end = (t_idx + 1) * head_dim
+                    
+                    # Scale the specific head's slice
+                    modified_output[:, :, start:end] = modified_output[:, :, start:end] * coefficient
+                    return modified_output
+                return hook
+
+            attn_layer = model.model.layers[h_enc_layer].self_attn
+            handles.append(attn_layer.q_proj.register_forward_hook(get_input_amplify_hook(h_idx, h_cof, "q")))
+            handles.append(attn_layer.k_proj.register_forward_hook(get_input_amplify_hook(h_idx, h_cof, "k")))
+            handles.append(attn_layer.v_proj.register_forward_hook(get_input_amplify_hook(h_idx, h_cof, "v")))
+            
+        if head_mode in ["amplify", "ablate", "reverse", "both_amplify"]:
+            # Output intervention hook
+            handles.append(
+                model.model.layers[h_enc_layer].self_attn.o_proj.register_forward_hook(
+                    get_head_intervention_hook(h_idx, h_cof)
+                )
             )
-        )
 
     handles.append(model.model.layers[capture_layer].register_forward_hook(capture_hook))
 
@@ -383,10 +394,10 @@ def main():
     parser.add_argument("--max_new_tokens", type=int, default=100)
 
     # ── Head ablation / amplification arguments ──────────────────────────
-    parser.add_argument("--head_layer", type=int, default=31,
-                        help="Layer containing the target attention head (default: 31)")
-    parser.add_argument("--head_index", type=int, default=14,
-                        help="Index of the attention head to intervene on (default: 14)")
+    parser.add_argument("--head_layer", type=int, nargs="+", default=[31],
+                        help="Layer(s) containing the target attention head (default: [31])")
+    parser.add_argument("--head_index", type=int, nargs="+", default=[14],
+                        help="Index(es) of the attention head to intervene on (default: [14])")
     parser.add_argument("--head_mode", type=str, default="amplify",
                         choices=["amplify", "ablate", "input_amplify", "reverse", "both_amplify"],
                         help="'amplify' = scale head output by --head_coeff, "
@@ -394,8 +405,8 @@ def main():
                              "'both_amplify' = scale both input and output by --head_coeff, "
                              "'reverse' = scale head output by -1 * --head_coeff, "
                              "'ablate' = zero out head entirely (default: amplify)")
-    parser.add_argument("--head_coeff", type=float, default=3.0,
-                        help="Multiplier for amplify/reverse mode (default: 3.0)")
+    parser.add_argument("--head_coeff", type=float, nargs="+", default=[3.0],
+                        help="Multiplier for amplify/reverse mode (default: [3.0])")
                         
     # ── Success vector arguments ─────────────────────────────────────────
     parser.add_argument("--success_direction", type=str, default=None,
@@ -444,7 +455,7 @@ def main():
     sys.stderr = TeeLogger(log_file, sys.__stderr__)
 
     # Load model
-    print(f"\n⏳ Loading model: {args.model}")
+    print(f"\\n⏳ Loading model: {args.model}")
     model = AutoModelForCausalLM.from_pretrained(args.model)
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -454,13 +465,19 @@ def main():
     head_dim = model.config.hidden_size // num_heads
     print(f"✅ Model loaded on {device}")
     print(f"   {model.config.num_hidden_layers} layers, {num_heads} heads, head_dim={head_dim}")
-    print(f"   Target head L{args.head_layer}.H{args.head_index} → {mode_desc}\n")
+    print(f"   Target head L{args.head_layer}.H{args.head_index} → {mode_desc}\\n")
 
     # Validate head indices
-    assert args.head_layer < model.config.num_hidden_layers, \
-        f"head_layer {args.head_layer} >= num_layers {model.config.num_hidden_layers}"
-    assert args.head_index < num_heads, \
-        f"head_index {args.head_index} >= num_heads {num_heads}"
+    # Handle list validation
+    h_layers = args.head_layer if isinstance(args.head_layer, list) else [args.head_layer]
+    h_indices = args.head_index if isinstance(args.head_index, list) else [args.head_index]
+    
+    for l in h_layers:
+        assert l < model.config.num_hidden_layers, \
+            f"head_layer {l} >= num_layers {model.config.num_hidden_layers}"
+    for i in h_indices:
+        assert i < num_heads, \
+            f"head_index {i} >= num_heads {num_heads}"
 
     # Load Success Vector if provided
     success_vec_tensor = None
@@ -491,13 +508,13 @@ def main():
     errors = 0
 
     for dataset_name in args.datasets:
-        print(f"\n{'=' * 60}")
+        print(f"\\n{'=' * 60}")
         print(f"  Dataset: {dataset_name}")
         print(f"{'=' * 60}")
 
         for layer in args.layers:
             # Compute concept vectors once per (dataset, layer)
-            print(f"\n  ⏳ Computing concept vectors at layer {layer} …")
+            print(f"\\n  ⏳ Computing concept vectors at layer {layer} …")
             vectors = compute_concept_vector(model, tokenizer, dataset_name, layer)
             capture_layer = args.capture_layer
 
@@ -505,7 +522,7 @@ def main():
                 steering_vector = vec_avg if args.vec_type == "avg" else vec_last
 
                 for coeff in args.coeffs:
-                    print(f"\n── {concept} | layer={layer} | coeff={coeff} | "
+                    print(f"\\n── {concept} | layer={layer} | coeff={coeff} | "
                           f"head=L{args.head_layer}.H{args.head_index} {mode_desc} ──")
 
                     # 1. Inject concept + head intervention and generate
@@ -524,6 +541,8 @@ def main():
                         )
                     except Exception as e:
                         print(f"  ⚠  Injection error: {e}")
+                        import traceback
+                        traceback.print_exc()
                         errors += 1
                         continue
 
@@ -535,9 +554,9 @@ def main():
 
                     icons = {
                         "not_detected": "⚫",
-                        "detected_opposite": "�",    # Red for opposite
+                        "detected_opposite": "",    # Red for opposite
                         "detected_orthogonal": "🟠",  # Orange for unrelated/orthogonal
-                        "detected_parallel": "�",    # Yellow for close/parallel
+                        "detected_parallel": "",    # Yellow for close/parallel
                         "detected_correct": "🟢",     # Green for correct
                     }
                     icon = icons.get(category, "❓")
@@ -545,8 +564,19 @@ def main():
 
                     # 3. Save activations
                     out_dir = category_dirs[category]
+                    
+                    # Construct filename for multiple heads
+                    if isinstance(args.head_layer, list) and len(args.head_layer) > 1:
+                        # Summarize or list?
+                        # Using formatted list string to handle multiple heads
+                        head_str = f"L{args.head_layer}-H{args.head_index}".replace(" ", "").replace("[", "").replace("]", "").replace(",", "_")
+                    else:
+                        hl = args.head_layer[0] if isinstance(args.head_layer, list) else args.head_layer
+                        hi = args.head_index[0] if isinstance(args.head_index, list) else args.head_index
+                        head_str = f"head{hl}-{hi}"
+
                     filename = (f"{concept}_layer{capture_layer}_coeff{coeff}"
-                                f"_{args.vec_type}_head{args.head_layer}-{args.head_index}.pt")
+                                f"_{args.vec_type}_{head_str}.pt")
                     save_data = {
                         "concept": concept,
                         "dataset": dataset_name,
@@ -574,7 +604,7 @@ def main():
 
     # Summary
     total = sum(counts.values())
-    print(f"\n{'=' * 60}")
+    print(f"\\n{'=' * 60}")
     print(f"  RESULTS  (concept@L{args.layers}, coeffs={args.coeffs}, "
           f"head=L{args.head_layer}.H{args.head_index} {mode_desc})")
     print(f"{'=' * 60}")
@@ -584,7 +614,7 @@ def main():
     print(f"  {'errors':25s}: {errors:3d}")
     print(f"  {'total':25s}: {total:3d}")
     print(f"  Saved to: {save_root.resolve()}")
-    print(f"{'=' * 60}\n")
+    print(f"{'=' * 60}\\n")
 
     # Close log
     sys.stdout = sys.__stdout__
