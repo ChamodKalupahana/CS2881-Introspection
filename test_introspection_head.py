@@ -256,6 +256,8 @@ def inject_and_capture_activations(
 
         if head_mode == "ablate":
             modified_inp[:, :, start:end] = 0.0
+        elif head_mode == "reverse":
+            modified_inp[:, :, start:end] = modified_inp[:, :, start:end] * (-head_coeff)
         else:  # amplify
             modified_inp[:, :, start:end] = modified_inp[:, :, start:end] * head_coeff
 
@@ -289,7 +291,7 @@ def inject_and_capture_activations(
         handles.append(model.model.layers[success_layer].register_forward_hook(success_injection_hook))
 
     # ── Head intervention registration ───────────────────────────────────
-    if head_mode == "input_amplify":
+    if head_mode in ["input_amplify", "both_amplify"]:
         # Input amplification: scale the output of q_proj, k_proj, v_proj
         # This effectively scales the input to the attention mechanism for this head.
         
@@ -324,7 +326,7 @@ def inject_and_capture_activations(
         handles.append(attn_layer.k_proj.register_forward_hook(get_input_amplify_hook("k")))
         handles.append(attn_layer.v_proj.register_forward_hook(get_input_amplify_hook("v")))
         
-    else:
+    if head_mode in ["amplify", "ablate", "reverse", "both_amplify"]:
         # Output intervention: hook into o_proj (amplify/ablate output of head)
         handles.append(
             model.model.layers[head_layer].self_attn.o_proj.register_forward_hook(
@@ -386,12 +388,14 @@ def main():
     parser.add_argument("--head_index", type=int, default=14,
                         help="Index of the attention head to intervene on (default: 14)")
     parser.add_argument("--head_mode", type=str, default="amplify",
-                        choices=["amplify", "ablate", "input_amplify"],
+                        choices=["amplify", "ablate", "input_amplify", "reverse", "both_amplify"],
                         help="'amplify' = scale head output by --head_coeff, "
                              "'input_amplify' = scale head input (Q,K,V) by --head_coeff, "
+                             "'both_amplify' = scale both input and output by --head_coeff, "
+                             "'reverse' = scale head output by -1 * --head_coeff, "
                              "'ablate' = zero out head entirely (default: amplify)")
     parser.add_argument("--head_coeff", type=float, default=3.0,
-                        help="Multiplier for amplify mode (default: 3.0)")
+                        help="Multiplier for amplify/reverse mode (default: 3.0)")
                         
     # ── Success vector arguments ─────────────────────────────────────────
     parser.add_argument("--success_direction", type=str, default=None,
@@ -422,6 +426,10 @@ def main():
         mode_desc = "ablate (zero out)"
     elif args.head_mode == "input_amplify":
         mode_desc = f"input_amplify ×{args.head_coeff}"
+    elif args.head_mode == "both_amplify":
+        mode_desc = f"both_amplify (input & output) ×{args.head_coeff}"
+    elif args.head_mode == "reverse":
+        mode_desc = f"reverse (multiply by -1.0 × {args.head_coeff})"
     else:
         mode_desc = f"amplify ×{args.head_coeff}"
     print(f"📁 Run directory: {save_root}")
