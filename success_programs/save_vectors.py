@@ -1,10 +1,17 @@
+import sys
+import os
+from pathlib import Path
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
 from compute_concept_vector_utils import compute_concept_vector
 from inject_concept_vector import inject_concept_vector
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import argparse
 import numpy as np
-from pathlib import Path
 def sweep_all_layers_and_coefficients(model, tokenizer, model_name, datasets, layer_range, save_dir):
     """Sweep all layers to compute concept vectors for all concepts in all datasets"""
     save_path = Path(save_dir)
@@ -46,7 +53,8 @@ def main():
                        default=list(range(32)),
                        help="Layer indices to sweep (default: 0-31)")
     parser.add_argument("--save_dir", type=str,
-                       default="/n/home10/ehahami/work/nov26_experiments/saved_vectors/llama",
+    parser.add_argument("--save_dir", type=str,
+                       default=str(PROJECT_ROOT / "saved_vectors"),
                        help="Directory to save vectors")
     
     args = parser.parse_args()

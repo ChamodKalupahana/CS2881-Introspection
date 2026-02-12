@@ -3,11 +3,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import argparse
+import argparse
+import sys
+import os
 from pathlib import Path
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, default="success_results/head_contributions_layers16-31.pt",
+    parser.add_argument("--input", type=str, default=str(PROJECT_ROOT / "success_results/head_contributions_layers16-31.pt"),
                         help="Path to the head contributions .pt file")
     args = parser.parse_args()
 

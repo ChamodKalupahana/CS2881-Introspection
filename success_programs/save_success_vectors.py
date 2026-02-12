@@ -18,9 +18,14 @@ Usage:
 
 import argparse
 import sys
+import os
 import torch
 from datetime import datetime
 from pathlib import Path
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from compute_concept_vector_utils import compute_concept_vector
@@ -289,7 +294,7 @@ def main():
                         choices=["avg", "last"])
     parser.add_argument("--datasets", type=str, nargs="+",
                         default=["simple_data", "complex_data"])
-    parser.add_argument("--save_dir", type=str, default="success_results")
+    parser.add_argument("--save_dir", type=str, default=str(PROJECT_ROOT / "success_results"))
     parser.add_argument("--max_new_tokens", type=int, default=100)
     parser.add_argument("--capture_all_layers", action="store_true",
                         help="Capture activations at every layer from inject_layer → 31")

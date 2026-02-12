@@ -1,6 +1,13 @@
 import torch
 import argparse
 import sys
+import os
+from pathlib import Path
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from compute_concept_vector_utils import compute_concept_vector
 from all_prompts import get_anthropic_reproduce_messages
@@ -179,9 +186,9 @@ def inject_and_capture_head_contributions(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, default="meta-llama/Meta-Llama-3.1-8B-Instruct")
-    parser.add_argument("--success_vector", type=str, default="success_results/average_success_vector_layers16-31.pt",
+    parser.add_argument("--success_vector", type=str, default=str(PROJECT_ROOT / "success_results/average_success_vector_layers16-31.pt"),
                         help="Path to the success vector file")
-    parser.add_argument("--output", type=str, default="success_results/head_contributions_layers16-31.pt",
+    parser.add_argument("--output", type=str, default=str(PROJECT_ROOT / "success_results/head_contributions_layers16-31.pt"),
                         help="Path to save the head contributions")
     args = parser.parse_args()
 

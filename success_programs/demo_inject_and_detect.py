@@ -13,6 +13,14 @@ Usage:
 """
 
 import argparse
+import sys
+import os
+from pathlib import Path
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -98,7 +106,7 @@ def interactive_concept_menu():
     import json
     from pathlib import Path
 
-    dataset_dir = Path(__file__).parent / "dataset"
+    dataset_dir = PROJECT_ROOT / "dataset"
 
     # Gather concepts from both datasets
     concepts_simple, concepts_complex = [], []
@@ -182,8 +190,9 @@ def main():
         else:
             # Auto-detect which dataset contains this concept
             import json
+            import json
             from pathlib import Path
-            dataset_dir = Path(__file__).parent / "dataset"
+            dataset_dir = PROJECT_ROOT / "dataset"
 
             with open(dataset_dir / "simple_data.json") as f:
                 simple = json.load(f)

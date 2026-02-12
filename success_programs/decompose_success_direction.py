@@ -13,8 +13,15 @@ Usage:
 """
 
 import argparse
+import sys
+import os
 import torch
 from pathlib import Path
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from compute_concept_vector_utils import compute_concept_vector
@@ -210,7 +217,7 @@ def main():
     parser.add_argument("--datasets", type=str, nargs="+",
                         default=["simple_data", "complex_data"])
     parser.add_argument("--success_direction", type=str,
-                        default="success_results/run_02_10_26_20_39/success_direction.pt")
+                        default=str(PROJECT_ROOT / "success_results/run_02_10_26_20_39/success_direction.pt"))
     parser.add_argument("--success_key", type=str, default="last_token",
                         choices=["last_token", "prompt_mean", "generation_mean"])
     parser.add_argument("--success_layer", type=int, default=17,
@@ -218,7 +225,7 @@ def main():
     parser.add_argument("--success_coeff", type=float, default=0.0,
                         help="Coefficient for success direction injection (0=off)")
     parser.add_argument("--max_new_tokens", type=int, default=100)
-    parser.add_argument("--save_dir", type=str, default="success_results")
+    parser.add_argument("--save_dir", type=str, default=str(PROJECT_ROOT/"success_results"))
     args = parser.parse_args()
 
     # ── Load success direction ───────────────────────────────────────────
