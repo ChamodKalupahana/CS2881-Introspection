@@ -246,11 +246,21 @@ def inject_and_capture_activations(
             modified = hidden_states + success_coeff * sdv_expanded
             return (modified,) + output[1:] if isinstance(output, tuple) else modified
 
-    # ── Head intervention hook generator ─────────────────────
-    def get_head_intervention_hook(head_idx, h_coeff):
-        def hook(module, input, output):
-            inp = input[0] if isinstance(input, tuple) else input
-            # Clone to avoid in-place mutation of the original tensor
+    # ── Head intervention hook generator (pre-hook on o_proj) ────────────────
+    def get_head_intervention_pre_hook(head_idx, h_coeff):
+        def hook(module, input):
+            inp = input[0] # input is a tuple
+            # Clone not strictly necessary if we modify in place and return, 
+            # but safer if we want to avoid side effects on other listeners (though rare here).
+            # If multiple hooks run, we want them to chain modifications.
+            # Modifying in place the tuple element 'inp' works if it's mutable. 
+            # But tuple itself is immutable.
+            # We must return a new tuple if we want to change input.
+            
+            # To support multiple hooks, we should modify the input tensor.
+            # If we clone, we break the chain? No, pre-hooks chain: output of hook 1 -> input of hook 2.
+            # So returning a modified tensor is correct.
+            
             modified_inp = inp.clone()
 
             start = head_idx * head_dim
@@ -263,9 +273,7 @@ def inject_and_capture_activations(
             else:  # amplify / both_amplify
                 modified_inp[:, :, start:end] = modified_inp[:, :, start:end] * h_coeff
 
-            # Recompute o_proj output with the modified input
-            new_output = torch.nn.functional.linear(modified_inp, module.weight, module.bias)
-            return new_output
+            return (modified_inp,)
         return hook
 
     # ── Capture hook ─────────────────────────────────────────────────────
@@ -314,7 +322,7 @@ def inject_and_capture_activations(
 
     for h_enc_layer, h_idx, h_cof in zip(h_layers, h_indices, h_coeffs):
         if head_mode in ["input_amplify", "both_amplify"]:
-            # Input amplification hooks
+            # Input amplification hooks (modifies output of Q/K/V projections)
             def get_input_amplify_hook(target_idx, coefficient, intervene_type="q"):
                 def hook(module, input, output):
                     # output shape: [batch, seq_len, num_heads * head_dim] (for q)
@@ -343,10 +351,10 @@ def inject_and_capture_activations(
             handles.append(attn_layer.v_proj.register_forward_hook(get_input_amplify_hook(h_idx, h_cof, "v")))
             
         if head_mode in ["amplify", "ablate", "reverse", "both_amplify"]:
-            # Output intervention hook
+            # Output intervention hook (pre-hook on o_proj input)
             handles.append(
-                model.model.layers[h_enc_layer].self_attn.o_proj.register_forward_hook(
-                    get_head_intervention_hook(h_idx, h_cof)
+                model.model.layers[h_enc_layer].self_attn.o_proj.register_forward_pre_hook(
+                    get_head_intervention_pre_hook(h_idx, h_cof)
                 )
             )
 

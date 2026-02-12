@@ -53,7 +53,51 @@ def main():
             mat[i, :] = vec
         matrices[case] = mat
         all_values.extend(mat.flatten())
+
+    # --- New Plot Logic ---
+    # Identify injected vs noinject cases
+    # Heuristic: ends with "_injected" or "_noinject"
+    injected_keys = [k for k in cases if "injected" in k.lower()]
+    noinject_keys = [k for k in cases if "noinject" in k.lower()]
+    
+    if len(injected_keys) > 0 and len(noinject_keys) == 1:
+        print(f"Computing Average Success - No Inject from:")
+        print(f"  Injected: {injected_keys}")
+        print(f"  No Inject: {noinject_keys[0]}")
         
+        # Compute average of injected
+        avg_mat = np.mean([matrices[k] for k in injected_keys], axis=0)
+        
+        # Subtract noinject
+        noinject_mat = matrices[noinject_keys[0]]
+        diff_mat = avg_mat - noinject_mat
+        
+        new_key = "Average Success - No Inject"
+        matrices[new_key] = diff_mat
+        cases.append(new_key)
+        all_values.extend(diff_mat.flatten())
+        num_cases += 1
+    else:
+        print("Could not automatically identify injected/noinject keys for the additional plot.")
+        
+    # --- Specific Difference Plots (e.g. Magnetism - Magnetism_noinject) ---
+    for noinject_key in noinject_keys:
+        # Expected format: "Name_noinject"
+        prefix = noinject_key.replace("_noinject", "")
+        # Find corresponding injected key: "Name_injected"
+        matching_injected = [k for k in injected_keys if k.startswith(prefix) and "injected" in k]
+        
+        if len(matching_injected) == 1:
+            injected_key = matching_injected[0]
+            print(f"Computing {prefix} difference: {injected_key} - {noinject_key}")
+            
+            diff_mat = matrices[injected_key] - matrices[noinject_key]
+            new_key = f"{prefix} Success - No Inject"
+            matrices[new_key] = diff_mat
+            cases.append(new_key)
+            all_values.extend(diff_mat.flatten())
+            num_cases += 1
+    # ----------------------
     
     print(f"Plotting {num_cases} cases with independent scales.")
 
