@@ -125,6 +125,8 @@ def inject_and_capture_activations(
     model, tokenizer, steering_vector, layer_to_inject, capture_layer,
     coeff=10.0, max_new_tokens=100,
     head_layer=31, head_index=14, head_mode="amplify", head_coeff=3.0,
+    success_vector=None, success_layer=None, success_coeff=0.0,
+    skip_concept=False,
 ):
     """
     Inject a concept vector at layer_to_inject (with coeff) and
@@ -145,14 +147,29 @@ def inject_and_capture_activations(
     head_dim = model.config.hidden_size // num_heads
 
     # ── Prepare concept steering vector ──────────────────────────────────
-    sv = steering_vector / torch.norm(steering_vector, p=2)
-    if not isinstance(sv, torch.Tensor):
-        sv = torch.tensor(sv, dtype=torch.float32)
-    sv = sv.to(device)
-    if sv.dim() == 1:
-        sv = sv.unsqueeze(0).unsqueeze(0)
-    elif sv.dim() == 2:
-        sv = sv.unsqueeze(0)
+    if not skip_concept and steering_vector is not None:
+        sv = steering_vector / torch.norm(steering_vector, p=2)
+        if not isinstance(sv, torch.Tensor):
+            sv = torch.tensor(sv, dtype=torch.float32)
+        sv = sv.to(device)
+        if sv.dim() == 1:
+            sv = sv.unsqueeze(0).unsqueeze(0)
+        elif sv.dim() == 2:
+            sv = sv.unsqueeze(0)
+    else:
+        sv = None
+
+    # ── Prepare success vector for injection ─────────────────────────────
+    sdv = None
+    if success_vector is not None:
+        sdv = success_vector / torch.norm(success_vector, p=2)
+        if not isinstance(sdv, torch.Tensor):
+            sdv = torch.tensor(sdv, dtype=torch.float32)
+        sdv = sdv.to(device)
+        if sdv.dim() == 1:
+            sdv = sdv.unsqueeze(0).unsqueeze(0)
+        elif sdv.dim() == 2:
+            sdv = sdv.unsqueeze(0)
 
     # Build Anthropic prompt
     messages = get_anthropic_reproduce_messages()
@@ -174,31 +191,42 @@ def inject_and_capture_activations(
     prompt_processed = False
 
     # ── Concept injection hook (at layer_to_inject) ──────────────────────
-    def concept_injection_hook(module, input, output):
-        nonlocal prompt_processed
-        hidden_states = output[0] if isinstance(output, tuple) else output
-        steer = sv.to(device=hidden_states.device, dtype=hidden_states.dtype)
-        batch_size, seq_len, hidden_dim = hidden_states.shape
-        steer_expanded = torch.zeros_like(hidden_states)
+    if not skip_concept and sv is not None:
+        def concept_injection_hook(module, input, output):
+            nonlocal prompt_processed
+            hidden_states = output[0] if isinstance(output, tuple) else output
+            steer = sv.to(device=hidden_states.device, dtype=hidden_states.dtype)
+            batch_size, seq_len, hidden_dim = hidden_states.shape
+            steer_expanded = torch.zeros_like(hidden_states)
 
-        if injection_start_token is not None:
-            is_generating = (seq_len == 1 and prompt_processed) or (seq_len > prompt_length)
-            if seq_len == prompt_length:
-                prompt_processed = True
-            if is_generating:
-                steer_expanded[:, -1:, :] = steer
+            if injection_start_token is not None:
+                is_generating = (seq_len == 1 and prompt_processed) or (seq_len > prompt_length)
+                if seq_len == prompt_length:
+                    prompt_processed = True
+                if is_generating:
+                    steer_expanded[:, -1:, :] = steer
+                else:
+                    start_idx = max(0, injection_start_token)
+                    if start_idx < seq_len:
+                        steer_expanded[:, start_idx:, :] = steer.expand(
+                            batch_size, seq_len - start_idx, -1
+                        )
             else:
-                start_idx = max(0, injection_start_token)
-                if start_idx < seq_len:
-                    steer_expanded[:, start_idx:, :] = steer.expand(
-                        batch_size, seq_len - start_idx, -1
-                    )
-        else:
-            if seq_len == 1:
-                steer_expanded[:, :, :] = steer
+                if seq_len == 1:
+                    steer_expanded[:, :, :] = steer
 
-        modified = hidden_states + coeff * steer_expanded
-        return (modified,) + output[1:] if isinstance(output, tuple) else modified
+            modified = hidden_states + coeff * steer_expanded
+            return (modified,) + output[1:] if isinstance(output, tuple) else modified
+
+    # ── Success vector injection hook (at success_layer) ─────────────────
+    if sdv is not None and success_layer is not None and success_coeff != 0:
+        def success_injection_hook(module, input, output):
+            hidden_states = output[0] if isinstance(output, tuple) else output
+            sdv_cast = sdv.to(device=hidden_states.device, dtype=hidden_states.dtype)
+            batch_size, seq_len, hidden_dim = hidden_states.shape
+            sdv_expanded = sdv_cast.expand(batch_size, seq_len, -1)
+            modified = hidden_states + success_coeff * sdv_expanded
+            return (modified,) + output[1:] if isinstance(output, tuple) else modified
 
     # ── Head ablation / amplification hook (at head_layer's o_proj) ──────
     #
@@ -241,7 +269,11 @@ def inject_and_capture_activations(
 
     # Register hooks & generate
     handles = []
-    handles.append(model.model.layers[layer_to_inject].register_forward_hook(concept_injection_hook))
+    if not skip_concept and sv is not None:
+        handles.append(model.model.layers[layer_to_inject].register_forward_hook(concept_injection_hook))
+    
+    if sdv is not None and success_layer is not None and success_coeff != 0:
+        handles.append(model.model.layers[success_layer].register_forward_hook(success_injection_hook))
 
     # Head intervention: hook into o_proj of the target layer's self_attn
     handles.append(
@@ -309,6 +341,19 @@ def main():
                              "'ablate' = zero out head entirely (default: amplify)")
     parser.add_argument("--head_coeff", type=float, default=3.0,
                         help="Multiplier for amplify mode (default: 3.0)")
+                        
+    # ── Success vector arguments ─────────────────────────────────────────
+    parser.add_argument("--success_direction", type=str, default=None,
+                        help="Path to success direction .pt file (optional)")
+    parser.add_argument("--success_key", type=str, default="last_token",
+                        choices=["last_token", "prompt_mean", "generation_mean"])
+    parser.add_argument("--success_layer", type=int, default=17,
+                        help="Layer to inject success vector at")
+    parser.add_argument("--success_coeff", type=float, default=0.0,
+                        help="Coefficient for success vector injection")
+    parser.add_argument("--skip_concept", action="store_true",
+                        help="Skip concept vector injection (only use success vector if provided)")
+                        
     args = parser.parse_args()
 
     # ── Create timestamped run directory ─────────────────────────────────
@@ -355,6 +400,30 @@ def main():
     assert args.head_index < num_heads, \
         f"head_index {args.head_index} >= num_heads {num_heads}"
 
+    # Load Success Vector if provided
+    success_vec_tensor = None
+    if args.success_direction:
+        print(f"⏳ Loading success vector: {args.success_direction}")
+        try:
+            sd_data = torch.load(args.success_direction, map_location="cpu", weights_only=False)
+            # data structure might be from compute_success_direction.py
+            # { "direction": {key: tensor}, ... }
+            if "direction" in sd_data:
+                success_vec_tensor = sd_data["direction"][args.success_key].float()
+            elif "activations" in sd_data:
+                 # It might be an activation vector file?
+                 # Assuming success direction format for now as per other scripts
+                 print("Warning: unexpected format, looking for 'direction' key")
+            else:
+                 # Maybe raw tensor dict?
+                 pass
+                 
+            if success_vec_tensor is not None:
+                print(f"✅ Success vector loaded (norm={success_vec_tensor.norm():.2f})")
+        except Exception as e:
+            print(f"Error loading success vector: {e}")
+            sys.exit(1)
+
     # Counters
     counts = {cat: 0 for cat in CATEGORIES}
     errors = 0
@@ -386,6 +455,10 @@ def main():
                             head_index=args.head_index,
                             head_mode=args.head_mode,
                             head_coeff=args.head_coeff,
+                            success_vector=success_vec_tensor,
+                            success_layer=args.success_layer,
+                            success_coeff=args.success_coeff,
+                            skip_concept=args.skip_concept,
                         )
                     except Exception as e:
                         print(f"  ⚠  Injection error: {e}")
