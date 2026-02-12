@@ -275,12 +275,49 @@ def inject_and_capture_activations(
     if sdv is not None and success_layer is not None and success_coeff != 0:
         handles.append(model.model.layers[success_layer].register_forward_hook(success_injection_hook))
 
-    # Head intervention: hook into o_proj of the target layer's self_attn
-    handles.append(
-        model.model.layers[head_layer].self_attn.o_proj.register_forward_hook(
-            head_intervention_hook
+    # ── Head intervention registration ───────────────────────────────────
+    if head_mode == "input_amplify":
+        # Input amplification: scale the output of q_proj, k_proj, v_proj
+        # This effectively scales the input to the attention mechanism for this head.
+        
+        # Determine GQA parameters
+        num_kv_heads = getattr(model.config, "num_key_value_heads", num_heads)
+        group_size = num_heads // num_kv_heads
+        
+        def get_input_amplify_hook(intervene_type="q"):
+            def hook(module, input, output):
+                # output shape: [batch, seq_len, num_heads * head_dim] (for q)
+                #            or [batch, seq_len, num_kv_heads * head_dim] (for k, v)
+                
+                # Clone output to avoid in-place modification
+                modified_output = output.clone()
+                
+                if intervene_type == "q":
+                    target_idx = head_index
+                else:
+                    # For K/V, verify we are targeting the correct group head
+                    target_idx = head_index // group_size
+                
+                start = target_idx * head_dim
+                end = (target_idx + 1) * head_dim
+                
+                # Scale the specific head's slice
+                modified_output[:, :, start:end] = modified_output[:, :, start:end] * head_coeff
+                return modified_output
+            return hook
+
+        attn_layer = model.model.layers[head_layer].self_attn
+        handles.append(attn_layer.q_proj.register_forward_hook(get_input_amplify_hook("q")))
+        handles.append(attn_layer.k_proj.register_forward_hook(get_input_amplify_hook("k")))
+        handles.append(attn_layer.v_proj.register_forward_hook(get_input_amplify_hook("v")))
+        
+    else:
+        # Output intervention: hook into o_proj (amplify/ablate output of head)
+        handles.append(
+            model.model.layers[head_layer].self_attn.o_proj.register_forward_hook(
+                head_intervention_hook
+            )
         )
-    )
 
     handles.append(model.model.layers[capture_layer].register_forward_hook(capture_hook))
 
@@ -336,8 +373,9 @@ def main():
     parser.add_argument("--head_index", type=int, default=14,
                         help="Index of the attention head to intervene on (default: 14)")
     parser.add_argument("--head_mode", type=str, default="amplify",
-                        choices=["amplify", "ablate"],
-                        help="'amplify' = scale head by --head_coeff, "
+                        choices=["amplify", "ablate", "input_amplify"],
+                        help="'amplify' = scale head output by --head_coeff, "
+                             "'input_amplify' = scale head input (Q,K,V) by --head_coeff, "
                              "'ablate' = zero out head entirely (default: amplify)")
     parser.add_argument("--head_coeff", type=float, default=3.0,
                         help="Multiplier for amplify mode (default: 3.0)")
@@ -367,9 +405,12 @@ def main():
         category_dirs[cat] = d
 
     total_combos = len(args.layers) * len(args.coeffs)
-    mode_desc = (f"ablate (zero out)"
-                 if args.head_mode == "ablate"
-                 else f"amplify ×{args.head_coeff}")
+    if args.head_mode == "ablate":
+        mode_desc = "ablate (zero out)"
+    elif args.head_mode == "input_amplify":
+        mode_desc = f"input_amplify ×{args.head_coeff}"
+    else:
+        mode_desc = f"amplify ×{args.head_coeff}"
     print(f"📁 Run directory: {save_root}")
     print(f"🔀 Sweeping {len(args.layers)} layers × {len(args.coeffs)} coeffs = {total_combos} combinations per concept")
     print(f"   Concept injection layers: {args.layers}")
