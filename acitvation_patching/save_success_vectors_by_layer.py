@@ -1,19 +1,16 @@
 """
-Save activations at a given layer during concept-injected inference,
-categorized by detection outcome:
+Save resid_post (layer output) activations during concept-injected inference,
+categorized by detection outcome.
 
-  success_results/
-    run_MM_DD_YY_HH_MM/
-      not_detected/           — model did not claim to detect an injection
-      detected_unnamed/       — model detected an injection but didn't name a concept
-      detected_incorrect/     — model detected an injection and named the wrong concept
-      detected_correct/       — model detected and correctly identified the concept
+Unlike save_success_vectors_by_head.py which captures per-head o_proj inputs,
+this script captures the full residual stream output of each decoder layer.
 
-Uses the Anthropic introspection prompt + GPT-5-nano judges.
+Saved structure:
+  category_dir / concept / layer_{N} / {concept}_layer{N}_{coeff}_{vec_type}.pt
 
 Usage:
-    python save_success_vectors.py
-    python save_success_vectors.py --layer 18 --coeff 12 --datasets simple_data
+    python save_success_vectors_by_layer.py --layers 16 --coeffs 8.0 --capture_all_layers --datasets simple_data
+    python save_success_vectors_by_layer.py --layers 16 --coeffs 8.0 --capture_all_layers --datasets simple_data --skip_concept
 """
 
 import argparse
@@ -135,34 +132,32 @@ def classify_response(response: str, concept: str) -> str:
         return "not_detected"
 
 
-# ── Injection + activation capture ───────────────────────────────────────────
+# ── Injection + resid_post capture ────────────────────────────────────────────
 
 def inject_and_capture_activations(
     model, tokenizer, steering_vector, layer_to_inject, capture_layers,
     coeff=10.0, max_new_tokens=100, skip_inject=False,
 ):
     """
-    Inject a concept vector and capture hidden-state activations.
+    Inject a concept vector and capture resid_post (layer output) activations.
 
     Args:
-        capture_layers: int or list[int]. If a single int, captures at that
-                        layer. If a list, captures at every listed layer.
+        capture_layers: int or list[int]. Layers to capture resid_post at.
 
     Returns:
         response (str): the model's generated text
-        activations (dict): if capture_layers is a single int, returns the
-            standard dict (last_token, prompt_mean, generation_mean, …).
-            If capture_layers is a list, returns a dict keyed by layer index,
-            each containing the standard activation dict.
-        last_prompt_logits (Tensor): logits at the last prompt token position,
-            shape (vocab_size,). These are the logits used to predict the first
-            generated token.
+        activations (dict): keyed by layer index, each containing:
+            last_token (hidden_size,), prompt_mean (hidden_size,),
+            generation_mean (hidden_size,), all_prompt (seq, hidden_size),
+            all_generation (gen_tokens, hidden_size).
+        last_prompt_logits (Tensor): logits at the last prompt token position.
     """
     multi_layer = isinstance(capture_layers, (list, tuple))
     if not multi_layer:
         capture_layers = [capture_layers]
 
     device = next(model.parameters()).device
+    hidden_size = model.config.hidden_size
 
     sv = steering_vector / torch.norm(steering_vector, p=2)
     if not isinstance(sv, torch.Tensor):
@@ -219,12 +214,11 @@ def inject_and_capture_activations(
         modified = hidden_states + coeff * steer_expanded
         return (modified,) + output[1:] if isinstance(output, tuple) else modified
 
-    # ── Capture hooks (one per layer) ────────────────────────────────────
+    # ── Resid-post capture hooks (one per layer) ─────────────────────────
+    # Hook the full decoder layer to capture its output (resid_post).
+    # output[0] is the hidden_states after attention + MLP + residual.
     captured_per_layer = {}
     capture_prompt_done_per_layer = {}
-    
-    num_heads = model.config.num_attention_heads
-    head_dim = model.config.hidden_size // num_heads
 
     for cl in capture_layers:
         captured_per_layer[cl] = {"prompt": None, "generation": []}
@@ -232,47 +226,31 @@ def inject_and_capture_activations(
 
     def make_capture_hook(layer_idx):
         def capture_hook(module, input, output):
-            # Hooking o_proj input: input is a tuple (hidden_states,)
-            # hidden_states shape: (batch, seq, hidden_dim) where hidden_dim = num_heads * head_dim
-            hidden_states = input[0]
-            
-            # Reshape to (batch, seq, num_heads, head_dim)
+            # output is a tuple; output[0] = hidden_states (batch, seq, hidden_size)
+            hidden_states = output[0] if isinstance(output, tuple) else output
             batch, seq, _ = hidden_states.shape
-            hidden_states_reshaped = hidden_states.view(batch, seq, num_heads, head_dim)
 
             if not capture_prompt_done_per_layer[layer_idx] and seq == prompt_length:
-                # Capture prompt: (seq, num_heads, head_dim) - taking batch 0
-                captured_per_layer[layer_idx]["prompt"] = hidden_states_reshaped[0].detach().cpu()
+                # Capture full prompt: (prompt_len, hidden_size)
+                captured_per_layer[layer_idx]["prompt"] = hidden_states[0].detach().cpu()
                 capture_prompt_done_per_layer[layer_idx] = True
             elif seq == 1 and capture_prompt_done_per_layer[layer_idx]:
-                # Capture generation step: (num_heads, head_dim) - taking batch 0, seq -1
-                captured_per_layer[layer_idx]["generation"].append(hidden_states_reshaped[0, -1].detach().cpu())
+                # Capture generation step: (hidden_size,)
+                captured_per_layer[layer_idx]["generation"].append(
+                    hidden_states[0, -1].detach().cpu()
+                )
 
-            # Return original input/output unmodified (hook shouldn't change control flow)
-            # For forward_hook on module, we return None to not modify output, 
-            # OR we return output. 
-            # Wait, this is `register_forward_hook`. 
-            # If we hook `o_proj`, `output` is the result of projection.
-            # We want to capture INPUT to o_proj.
-            # `input` is (concatenated_heads,).
-            return None # Do not modify output
-            
+            return None  # Do not modify output
+
         return capture_hook
-        
-    def make_capture_hook_pre(layer_idx):
-         # Using forward_pre_hook to capture input to o_proj safely?
-         # No, register_forward_hook receives (module, input, output). 
-         # We can read input there.
-         pass
 
     # Register hooks & generate
     handles = []
     if not skip_inject:
         handles.append(model.model.layers[layer_to_inject].register_forward_hook(injection_hook))
     for cl in capture_layers:
-        # Target self_attn.o_proj to get the concatenated head outputs (which are the input to o_proj)
-        # Note: Llama 3 implementation might vary, but typically o_proj takes [batch, seq, hidden]
-        handles.append(model.model.layers[cl].self_attn.o_proj.register_forward_hook(make_capture_hook(cl)))
+        # Hook the full decoder layer to capture resid_post
+        handles.append(model.model.layers[cl].register_forward_hook(make_capture_hook(cl)))
 
     with torch.no_grad():
         out = model.generate(
@@ -286,33 +264,24 @@ def inject_and_capture_activations(
     for h in handles:
         h.remove()
 
-    # Last prompt token logits: scores[0] is the logit distribution produced
-    # after processing the full prompt (used to pick the first generated token)
+    # Last prompt token logits
     last_prompt_logits = out.scores[0][0].detach().cpu()  # (vocab_size,)
 
     # Decode
     generated_ids = out.sequences[0][prompt_length:]
     response = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
 
-    # Package activations per layer
-    hidden_size = model.config.hidden_size
-
+    # Package activations per layer — all tensors are full hidden_size
     def _package(cap):
-        # generation: list of (num_heads, head_dim)
-        # prompt: (prompt_len, num_heads, head_dim)
-        
         gen_stack = torch.stack(cap["generation"]) if cap["generation"] else torch.empty(0)
-        # gen_stack shape: (new_tokens, num_heads, head_dim)
-        
+        # gen_stack: (gen_tokens, hidden_size)
         prompt_acts = cap["prompt"] if cap["prompt"] is not None else torch.empty(0)
-        # prompt_acts shape: (prompt_len, num_heads, head_dim)
-        
-        # Means should be over seq dimension, preserving (num_heads, head_dim)
-        
+        # prompt_acts: (prompt_len, hidden_size)
+
         return {
-            "last_token":      gen_stack[-1] if len(gen_stack) > 0 else torch.zeros(num_heads, head_dim),
-            "prompt_mean":     prompt_acts.mean(dim=0) if prompt_acts.numel() > 0 else torch.zeros(num_heads, head_dim),
-            "generation_mean": gen_stack.mean(dim=0) if len(gen_stack) > 0 else torch.zeros(num_heads, head_dim),
+            "last_token":      gen_stack[-1] if len(gen_stack) > 0 else torch.zeros(hidden_size),
+            "prompt_mean":     prompt_acts.mean(dim=0) if prompt_acts.numel() > 0 else torch.zeros(hidden_size),
+            "generation_mean": gen_stack.mean(dim=0) if len(gen_stack) > 0 else torch.zeros(hidden_size),
             "all_prompt":      prompt_acts,
             "all_generation":  gen_stack,
         }
@@ -321,7 +290,7 @@ def inject_and_capture_activations(
         activations = {cl: _package(captured_per_layer[cl]) for cl in capture_layers}
     else:
         activations = _package(captured_per_layer[capture_layers[0]])
-    
+
     return response, activations, last_prompt_logits
 
 
@@ -378,9 +347,8 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
-    num_heads = model.config.num_attention_heads
-    head_dim = model.config.hidden_size // num_heads
-    print(f"✅ Model loaded on {device} ({num_heads} heads, head_dim={head_dim})\n")
+    hidden_size = model.config.hidden_size
+    print(f"✅ Model loaded on {device} (hidden_size={hidden_size})\n")
 
     # Counters
     counts = {cat: 0 for cat in CATEGORIES}
@@ -397,7 +365,7 @@ def main():
             vectors = compute_concept_vector(model, tokenizer, dataset_name, layer)
             if args.capture_all_layers:
                 capture_layers = list(range(16, 32))
-                print(f"  📊 Capturing all layers: 16 → 31 (per head)")
+                print(f"  📊 Capturing resid_post at layers: 16 → 31")
             elif args.capture_layer is not None:
                 capture_layers = args.capture_layer
             else:
@@ -438,65 +406,43 @@ def main():
                     icon = icons.get(category, "❓")
                     print(f"  {icon}  Category: {category}")
 
-                    # 3. Save activations — one file per (layer, head)
+                    # 3. Save activations — one file per layer (resid_post)
                     out_dir = category_dirs[category]
                     coeff_label = "noinject" if args.skip_concept else f"coeff{coeff}"
 
                     # Determine list of layers present in activations
                     if isinstance(activations, dict) and all(isinstance(k, int) for k in activations.keys()):
-                        # Multi-layer capture: activations is {layer_idx: {last_token, prompt_mean, ...}}
                         layers_to_save = sorted(activations.keys())
                     else:
-                        # Single-layer capture: wrap in dict for uniform handling
                         single_layer = capture_layers if isinstance(capture_layers, int) else capture_layers[0]
                         activations = {single_layer: activations}
                         layers_to_save = [single_layer]
 
                     for save_layer in layers_to_save:
                         layer_acts = activations[save_layer]
-                        # Each value in layer_acts has shape (num_heads, head_dim) or
-                        # (seq, num_heads, head_dim) for all_prompt / all_generation
 
-                        for head_idx in range(num_heads):
-                            # Slice out this head from every activation tensor
-                            head_acts = {}
-                            for key, tensor in layer_acts.items():
-                                if tensor.numel() == 0:
-                                    head_acts[key] = tensor
-                                elif tensor.dim() == 2:
-                                    # (num_heads, head_dim) → (head_dim,)
-                                    head_acts[key] = tensor[head_idx]
-                                elif tensor.dim() == 3:
-                                    # (seq, num_heads, head_dim) → (seq, head_dim)
-                                    head_acts[key] = tensor[:, head_idx, :]
-                                else:
-                                    head_acts[key] = tensor  # fallback: keep as-is
+                        # Build path: category_dir / concept / layer_{N} / filename.pt
+                        layer_dir = out_dir / concept / f"layer_{save_layer}"
+                        layer_dir.mkdir(parents=True, exist_ok=True)
+                        filename = f"{concept}_layer{save_layer}_{coeff_label}_{args.vec_type}.pt"
 
-                            # Build path: category_dir / concept / layer_{N} / head_{H} / filename.pt
-                            head_dir = out_dir / concept / f"layer_{save_layer}" / f"head_{head_idx}"
-                            head_dir.mkdir(parents=True, exist_ok=True)
-                            filename = f"{concept}_layer{save_layer}_head{head_idx}_{coeff_label}_{args.vec_type}.pt"
+                        save_data = {
+                            "concept": concept,
+                            "dataset": dataset_name,
+                            "category": category,
+                            "inject_layer": layer,
+                            "capture_layer": save_layer,
+                            "coeff": coeff,
+                            "vec_type": args.vec_type,
+                            "model_name": args.model,
+                            "response": response,
+                            "activations": layer_acts,
+                        }
+                        torch.save(save_data, layer_dir / filename)
 
-                            save_data = {
-                                "concept": concept,
-                                "dataset": dataset_name,
-                                "category": category,
-                                "inject_layer": layer,
-                                "capture_layer": save_layer,
-                                "head_idx": head_idx,
-                                "num_heads": num_heads,
-                                "head_dim": head_dim,
-                                "coeff": coeff,
-                                "vec_type": args.vec_type,
-                                "model_name": args.model,
-                                "response": response,
-                                "activations": head_acts,
-                            }
-                            torch.save(save_data, head_dir / filename)
+                    print(f"  💾  Saved resid_post for {len(layers_to_save)} layers → {out_dir / concept}/")
 
-                        print(f"  💾  Saved {num_heads} heads for layer {save_layer} → {out_dir / concept / f'layer_{save_layer}/'}")
-
-                    # Save last_prompt_logits once per concept (shared across all layers/heads)
+                    # Save last_prompt_logits once per concept
                     concept_dir = out_dir / concept
                     concept_dir.mkdir(parents=True, exist_ok=True)
                     logits_filename = f"last_prompt_logits_{coeff_label}_{args.vec_type}.pt"
