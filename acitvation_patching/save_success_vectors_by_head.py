@@ -154,6 +154,9 @@ def inject_and_capture_activations(
             standard dict (last_token, prompt_mean, generation_mean, …).
             If capture_layers is a list, returns a dict keyed by layer index,
             each containing the standard activation dict.
+        last_prompt_logits (Tensor): logits at the last prompt token position,
+            shape (vocab_size,). These are the logits used to predict the first
+            generated token.
     """
     multi_layer = isinstance(capture_layers, (list, tuple))
     if not multi_layer:
@@ -272,13 +275,23 @@ def inject_and_capture_activations(
         handles.append(model.model.layers[cl].self_attn.o_proj.register_forward_hook(make_capture_hook(cl)))
 
     with torch.no_grad():
-        out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+        out = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            return_dict_in_generate=True,
+            output_scores=True,
+        )
 
     for h in handles:
         h.remove()
 
+    # Last prompt token logits: scores[0] is the logit distribution produced
+    # after processing the full prompt (used to pick the first generated token)
+    last_prompt_logits = out.scores[0][0].detach().cpu()  # (vocab_size,)
+
     # Decode
-    generated_ids = out[0][prompt_length:]
+    generated_ids = out.sequences[0][prompt_length:]
     response = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
 
     # Package activations per layer
@@ -309,7 +322,7 @@ def inject_and_capture_activations(
     else:
         activations = _package(captured_per_layer[capture_layers[0]])
     
-    return response, activations
+    return response, activations, last_prompt_logits
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -399,7 +412,7 @@ def main():
 
                     # 1. Inject and generate
                     try:
-                        response, activations = inject_and_capture_activations(
+                        response, activations, last_prompt_logits = inject_and_capture_activations(
                             model, tokenizer, steering_vector, layer, capture_layers,
                             coeff=coeff, max_new_tokens=args.max_new_tokens,
                             skip_inject=args.skip_concept,
@@ -409,7 +422,7 @@ def main():
                         errors += 1
                         continue
 
-                    print(f"  Response: {response[:120]}{'…' if len(response) > 120 else ''}")
+                    print(f"  Response: {response[:220]}{'…' if len(response) > 220 else ''}")
 
                     # 2. Classify with judges
                     category = classify_response(response, concept)
@@ -459,9 +472,9 @@ def main():
                                 else:
                                     head_acts[key] = tensor  # fallback: keep as-is
 
-                            # Build path: category_dir / layer<N> / concept_layer<N>_head<H>_coeff_vec.pt
-                            layer_dir = out_dir / f"layer{save_layer}"
-                            layer_dir.mkdir(parents=True, exist_ok=True)
+                            # Build path: category_dir / concept / layer_{N} / head_{H} / filename.pt
+                            head_dir = out_dir / concept / f"layer_{save_layer}" / f"head_{head_idx}"
+                            head_dir.mkdir(parents=True, exist_ok=True)
                             filename = f"{concept}_layer{save_layer}_head{head_idx}_{coeff_label}_{args.vec_type}.pt"
 
                             save_data = {
@@ -479,9 +492,26 @@ def main():
                                 "response": response,
                                 "activations": head_acts,
                             }
-                            torch.save(save_data, layer_dir / filename)
+                            torch.save(save_data, head_dir / filename)
 
-                        print(f"  💾  Saved {num_heads} heads for layer {save_layer} → {out_dir / f'layer{save_layer}/'}")
+                        print(f"  💾  Saved {num_heads} heads for layer {save_layer} → {out_dir / concept / f'layer_{save_layer}/'}")
+
+                    # Save last_prompt_logits once per concept (shared across all layers/heads)
+                    concept_dir = out_dir / concept
+                    concept_dir.mkdir(parents=True, exist_ok=True)
+                    logits_filename = f"last_prompt_logits_{coeff_label}_{args.vec_type}.pt"
+                    torch.save({
+                        "concept": concept,
+                        "dataset": dataset_name,
+                        "category": category,
+                        "inject_layer": layer,
+                        "coeff": coeff,
+                        "vec_type": args.vec_type,
+                        "model_name": args.model,
+                        "response": response,
+                        "last_prompt_logits": last_prompt_logits,
+                    }, concept_dir / logits_filename)
+                    print(f"  💾  Saved last_prompt_logits → {concept_dir / logits_filename}")
 
 
     # Summary

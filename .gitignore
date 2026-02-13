@@ -28,6 +28,7 @@ old_results/*.parquet
 # Saved vectors (large binary files)
 saved_vectors/**/*.pt
 success_results/**/*.pt
+acitvation_patching/**/*.pt
 
 # Plots (can be regenerated)
 # plots/*.png
