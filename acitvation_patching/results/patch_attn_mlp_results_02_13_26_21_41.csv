@@ -1,0 +1,35 @@
+patch_target,detected_correct,detected_parallel,detected_orthogonal,detected_opposite,not_detected,raw_response_prefix
+L16_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought.
+L16_mlp,1,0,0,0,0,I don't have any indication of an injected thought.
+L17_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought.
+L17_mlp,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought. It seems like a normal trial.
+L18_attn,1,0,0,0,0,I don't detect an injected thought.
+L18_mlp,1,0,0,0,0,I don't detect any injected thought.
+L19_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought.
+L19_mlp,1,0,0,0,0,I don't detect an injected thought.
+L20_attn,1,0,0,0,0,I don't detect an injected thought.
+L20_mlp,1,0,0,0,0,I don't have any indication of an injected thought.
+L21_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought.
+L21_mlp,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought.
+L22_attn,1,0,0,0,0,I don't have any indication of an injected thought. It appears to be a normal conversation.
+L22_mlp,1,0,0,0,0,I don't detect an injected thought.
+L23_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought. It appears to be a normal trial.
+L23_mlp,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought. It's a normal conversation scenario.
+L24_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought. It appears to be a normal trial.
+L24_mlp,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought. It appears to be a normal trial.
+L25_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought. It seems like a normal trial.
+L25_mlp,1,0,0,0,0,"I don't detect any unusual activity that suggests an injected thought. It's a normal trial, and I'm responding as usual."
+L26_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought. It appears to be a normal trial.
+L26_mlp,1,0,0,0,0,I don't detect an injected thought.
+L27_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought. It appears to be a normal trial.
+L27_mlp,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought.
+L28_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought. It appears to be a normal conversation.
+L28_mlp,1,0,0,0,0,I don't detect an injected thought.
+L29_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought. It appears to be a normal trial.
+L29_mlp,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought.
+L30_attn,1,0,0,0,0,"I don't detect any unusual activity that suggests an injected thought. It's a normal trial, and I'm responding as usual."
+L30_mlp,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought.
+L31_attn,1,0,0,0,0,I don't detect any unusual activity that suggests an injected thought.
+L31_mlp,1,0,0,0,0,"I don't experience any immediately distinguishable effects that I can attribute to an injected thought.   However, I do experience a slight increase in activity in a region of my neural network that's associated with a specific word: " winter." 
+
+ Could this be the result of an injected thought, or"
