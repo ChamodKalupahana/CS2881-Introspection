@@ -1,24 +1,18 @@
 """
-Run a sweep of intervention experiments for head (L17.H3) and MLP (L21)
+Run a sweep of intervention experiments for head(s) and MLP layers
 with a single model load, collecting category counts into a summary CSV.
 
-Experiments:
-  1. control          – concept injection only (no head/MLP intervention)
-  2. head_amplify     – head L17.H3 input_amplify ×coeff
-  3. head_amplify_nc  – head L17.H3 input_amplify ×coeff, skip concept injection
-  4. head_ablate      – head L17.H3 ablate
-  5. head_reverse     – head L17.H3 reverse ×coeff
-  6. mlp_amplify      – MLP L21 input_amplify ×coeff
-  7. mlp_amplify_nc   – MLP L21 input_amplify ×coeff, skip concept injection
-  8. mlp_ablate       – MLP L21 ablate
-  9. mlp_reverse      – MLP L21 reverse ×coeff
+Experiments (dynamically built per head pair and MLP layer):
+  1. control – concept injection only (no head/MLP intervention)
+  For each --head_layer/--head_index pair (L, H):
+     L{L}H{H}_input_amplify / _input_amplify_no_concept / _ablate / _reverse
+  For each --mlp_layer L:
+     mlp{L}_input_amplify / _input_amplify_no_concept / _ablate / _reverse
 
 Usage:
-    python run_intervention_sweep.py
-    python run_intervention_sweep.py --inject_layer 16 --inject_coeff 5 \\
-        --head_layer 17 --head_index 3 --head_coeff 5.0 \\
-        --mlp_layer 21 --mlp_coeff 5.0 \\
-        --dataset test_data
+    python run_intervention_sweep.py --inject_coeff 5 \\
+        --head_layer 17 31 --head_index 3 3 --head_coeff 5.0 \\
+        --mlp_layer 17 21 29 --mlp_coeff 2.0 --dataset test_data
 """
 
 import argparse, csv, sys, os, torch
@@ -32,6 +26,26 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from compute_concept_vector_utils import compute_concept_vector
 from all_prompts import get_anthropic_reproduce_messages
 from api_utils import query_llm_judge, client
+
+
+class TeeLogger:
+    """Duplicate writes to both a file and the original stream."""
+    def __init__(self, log_file, stream):
+        self.log_file = log_file
+        self.stream = stream
+
+    def write(self, message):
+        self.stream.write(message)
+        self.log_file.write(message)
+        self.log_file.flush()
+
+    def flush(self):
+        self.stream.flush()
+        self.log_file.flush()
+
+    def fileno(self):
+        return self.stream.fileno()
+
 
 # ── Classification (same as other scripts) ───────────────────────────────────
 
@@ -295,10 +309,13 @@ def main():
                         default="meta-llama/Meta-Llama-3.1-8B-Instruct")
     parser.add_argument("--inject_layer", type=int, default=16)
     parser.add_argument("--inject_coeff", type=float, default=5.0)
-    parser.add_argument("--head_layer", type=int, default=17)
-    parser.add_argument("--head_index", type=int, default=3)
+    parser.add_argument("--head_layer", type=int, nargs="+", default=[17],
+                        help="Head layers to sweep (default: [17])")
+    parser.add_argument("--head_index", type=int, nargs="+", default=[3],
+                        help="Head indices paired with --head_layer (default: [3])")
     parser.add_argument("--head_coeff", type=float, default=5.0)
-    parser.add_argument("--mlp_layer", type=int, default=21)
+    parser.add_argument("--mlp_layer", type=int, nargs="+", default=[21],
+                        help="MLP layers to sweep (default: [21])")
     parser.add_argument("--mlp_coeff", type=float, default=5.0)
     parser.add_argument("--dataset", type=str, default="test_data")
     parser.add_argument("--vec_type", type=str, default="avg", choices=["avg", "last"])
@@ -307,7 +324,16 @@ def main():
                         default=str(PROJECT_ROOT / "success_programs" / "sweep_results"))
     args = parser.parse_args()
 
-    # Define experiment configurations
+    # Validate head args are paired
+    if len(args.head_layer) != len(args.head_index):
+        parser.error("--head_layer and --head_index must have the same number of values")
+
+    # Define experiment configurations — per-head and per-MLP-layer experiments
+    head_pairs = list(zip(args.head_layer, args.head_index))
+    head_tag = "_".join(f"L{l}H{h}" for l, h in head_pairs)
+    mlp_layers = args.mlp_layer
+    mlp_tag = "-".join(str(l) for l in mlp_layers)
+
     experiments = [
         {
             "name": "control",
@@ -315,59 +341,70 @@ def main():
             "head_layer": None, "head_index": None, "head_mode": None, "head_coeff": 1.0,
             "mlp_layer": None, "mlp_mode": None, "mlp_coeff": 1.0,
         },
-        {
-            "name": "head_input_amplify",
-            "skip_concept": False,
-            "head_layer": args.head_layer, "head_index": args.head_index,
-            "head_mode": "input_amplify", "head_coeff": args.head_coeff,
-            "mlp_layer": None, "mlp_mode": None, "mlp_coeff": 1.0,
-        },
-        {
-            "name": "head_input_amplify_no_concept",
-            "skip_concept": True,
-            "head_layer": args.head_layer, "head_index": args.head_index,
-            "head_mode": "input_amplify", "head_coeff": args.head_coeff,
-            "mlp_layer": None, "mlp_mode": None, "mlp_coeff": 1.0,
-        },
-        {
-            "name": "head_ablate",
-            "skip_concept": False,
-            "head_layer": args.head_layer, "head_index": args.head_index,
-            "head_mode": "ablate", "head_coeff": 1.0,
-            "mlp_layer": None, "mlp_mode": None, "mlp_coeff": 1.0,
-        },
-        {
-            "name": "head_reverse",
-            "skip_concept": False,
-            "head_layer": args.head_layer, "head_index": args.head_index,
-            "head_mode": "reverse", "head_coeff": args.head_coeff,
-            "mlp_layer": None, "mlp_mode": None, "mlp_coeff": 1.0,
-        },
-        {
-            "name": "mlp_input_amplify",
-            "skip_concept": False,
-            "head_layer": None, "head_index": None, "head_mode": None, "head_coeff": 1.0,
-            "mlp_layer": args.mlp_layer, "mlp_mode": "input_amplify", "mlp_coeff": args.mlp_coeff,
-        },
-        {
-            "name": "mlp_input_amplify_no_concept",
-            "skip_concept": True,
-            "head_layer": None, "head_index": None, "head_mode": None, "head_coeff": 1.0,
-            "mlp_layer": args.mlp_layer, "mlp_mode": "input_amplify", "mlp_coeff": args.mlp_coeff,
-        },
-        {
-            "name": "mlp_ablate",
-            "skip_concept": False,
-            "head_layer": None, "head_index": None, "head_mode": None, "head_coeff": 1.0,
-            "mlp_layer": args.mlp_layer, "mlp_mode": "ablate", "mlp_coeff": 1.0,
-        },
-        {
-            "name": "mlp_reverse",
-            "skip_concept": False,
-            "head_layer": None, "head_index": None, "head_mode": None, "head_coeff": 1.0,
-            "mlp_layer": args.mlp_layer, "mlp_mode": "reverse", "mlp_coeff": args.mlp_coeff,
-        },
     ]
+
+    # Add head experiments for each specified (layer, head) pair
+    for hl, hi in head_pairs:
+        tag = f"L{hl}H{hi}"
+        experiments.extend([
+            {
+                "name": f"{tag}_input_amplify",
+                "skip_concept": False,
+                "head_layer": hl, "head_index": hi,
+                "head_mode": "input_amplify", "head_coeff": args.head_coeff,
+                "mlp_layer": None, "mlp_mode": None, "mlp_coeff": 1.0,
+            },
+            {
+                "name": f"{tag}_input_amplify_no_concept",
+                "skip_concept": True,
+                "head_layer": hl, "head_index": hi,
+                "head_mode": "input_amplify", "head_coeff": args.head_coeff,
+                "mlp_layer": None, "mlp_mode": None, "mlp_coeff": 1.0,
+            },
+            {
+                "name": f"{tag}_ablate",
+                "skip_concept": False,
+                "head_layer": hl, "head_index": hi,
+                "head_mode": "ablate", "head_coeff": 1.0,
+                "mlp_layer": None, "mlp_mode": None, "mlp_coeff": 1.0,
+            },
+            {
+                "name": f"{tag}_reverse",
+                "skip_concept": False,
+                "head_layer": hl, "head_index": hi,
+                "head_mode": "reverse", "head_coeff": args.head_coeff,
+                "mlp_layer": None, "mlp_mode": None, "mlp_coeff": 1.0,
+            },
+        ])
+
+    # Add MLP experiments for each specified layer
+    for ml in mlp_layers:
+        experiments.extend([
+            {
+                "name": f"mlp{ml}_input_amplify",
+                "skip_concept": False,
+                "head_layer": None, "head_index": None, "head_mode": None, "head_coeff": 1.0,
+                "mlp_layer": ml, "mlp_mode": "input_amplify", "mlp_coeff": args.mlp_coeff,
+            },
+            {
+                "name": f"mlp{ml}_input_amplify_no_concept",
+                "skip_concept": True,
+                "head_layer": None, "head_index": None, "head_mode": None, "head_coeff": 1.0,
+                "mlp_layer": ml, "mlp_mode": "input_amplify", "mlp_coeff": args.mlp_coeff,
+            },
+            {
+                "name": f"mlp{ml}_ablate",
+                "skip_concept": False,
+                "head_layer": None, "head_index": None, "head_mode": None, "head_coeff": 1.0,
+                "mlp_layer": ml, "mlp_mode": "ablate", "mlp_coeff": 1.0,
+            },
+            {
+                "name": f"mlp{ml}_reverse",
+                "skip_concept": False,
+                "head_layer": None, "head_index": None, "head_mode": None, "head_coeff": 1.0,
+                "mlp_layer": ml, "mlp_mode": "reverse", "mlp_coeff": args.mlp_coeff,
+            },
+        ])
 
     # ── Load model ───────────────────────────────────────────────────────
     print(f"⏳ Loading model: {args.model}")
@@ -375,7 +412,9 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
-    print(f"✅ Model loaded on {device}\n")
+    print(f"✅ Model loaded on {device}")
+    print(f"   Heads: {[f'L{l}.H{h}' for l, h in head_pairs]}  MLP layers: {mlp_layers}")
+    print(f"   {len(experiments)} experiments per concept\n")
 
     # ── Compute concept vectors ──────────────────────────────────────────
     print(f"⏳ Computing concept vectors for '{args.dataset}' at layer {args.inject_layer} …")
@@ -387,7 +426,14 @@ def main():
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     now = datetime.now().strftime("%m_%d_%y_%H_%M")
-    csv_path = out_dir / f"sweep_H{args.head_layer}-{args.head_index}_MLP{args.mlp_layer}_{now}.csv"
+    csv_path = out_dir / f"sweep_{head_tag}_MLP{mlp_tag}_{now}.csv"
+
+    # Set up logging to file + terminal
+    log_file = open(out_dir / "run.log", "w")
+    sys.stdout = TeeLogger(log_file, sys.__stdout__)
+    sys.stderr = TeeLogger(log_file, sys.__stderr__)
+
+    print(f"📁 Output directory: {out_dir}")
 
     # ── Run sweep ────────────────────────────────────────────────────────
     # Results: {exp_name: {category: count}}
@@ -450,30 +496,37 @@ def main():
             writer.writerow(row)
 
     # ── Print summary ────────────────────────────────────────────────────
-    print(f"\n{'=' * 80}")
-    print(f"  SWEEP RESULTS | head=L{args.head_layer}.H{args.head_index}  mlp=L{args.mlp_layer}")
+    print(f"\n{'=' * 100}")
+    print(f"  SWEEP RESULTS | heads={[f'L{l}.H{h}' for l, h in head_pairs]}  mlp_layers={mlp_layers}")
     print(f"  inject_layer={args.inject_layer}  inject_coeff={args.inject_coeff}")
+    print(f"  head_coeff={args.head_coeff}  mlp_coeff={args.mlp_coeff}")
     print(f"  dataset={args.dataset}  concepts={len(concepts)}")
-    print(f"{'=' * 80}")
-    header = f"  {'experiment':35s}"
+    print(f"{'=' * 100}")
+    header = f"  {'experiment':40s}"
     for cat in CATEGORIES:
         short = cat.replace("detected_", "d_")
         header += f" {short:>8s}"
     header += f" {'errors':>6s} {'total':>5s}"
     print(header)
-    print(f"  {'─' * 95}")
+    print(f"  {'─' * 100}")
     for exp in experiments:
         name = exp["name"]
         counts = results[name]
         total = sum(counts.values())
-        line = f"  {name:35s}"
+        line = f"  {name:40s}"
         for cat in CATEGORIES:
             line += f" {counts[cat]:8d}"
         line += f" {errors[name]:6d} {total:5d}"
         print(line)
-    print(f"{'=' * 80}")
+    print(f"{'=' * 100}")
     print(f"  CSV saved to: {csv_path.resolve()}")
-    print(f"{'=' * 80}\n")
+    print(f"{'=' * 100}\n")
+
+    # Close log
+    sys.stdout = sys.__stdout__
+    sys.stderr = sys.__stderr__
+    log_file.close()
+    print(f"📝 Log saved to {out_dir / 'run.log'}")
 
 
 if __name__ == "__main__":

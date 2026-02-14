@@ -30,7 +30,7 @@ def main():
             return
 
         # 1. Identify specific positive concepts: Entropy, Magnetism, Satellites
-        concepts = ["Entropy", "Magnetism", "Satellites"]
+        concepts = ["Magnetism", "Satellites"]
         pos_paths = []
         for c in concepts:
             matches = glob.glob(os.path.join(detect_dir, f"{c}_*.pt"))

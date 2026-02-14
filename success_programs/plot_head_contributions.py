@@ -116,7 +116,7 @@ def main():
         
         # Plot heatmap
         sns.heatmap(mat, ax=ax, cmap="RdBu_r", center=0, vmin=vmin, vmax=vmax,
-                    cbar=True, cbar_kws={"shrink": 0.6}, square=True)
+                    cbar=True, cbar_kws={"shrink": 0.3}, square=True)
         
         ax.set_title(case)
         ax.set_xlabel("Head Index")
@@ -137,6 +137,32 @@ def main():
     pdf_path = str(out_path).replace(".png", ".pdf")
     plt.savefig(pdf_path)
     print(f"Saved PDF to {pdf_path}")
+    plt.close(fig)
+
+    # ── Standalone figure for the final subplot ──────────────────────────
+    last_case = cases[-1]
+    last_mat = matrices[last_case]
+    limit = np.nanmax(np.abs(last_mat))
+    if limit == 0:
+        limit = 1.0
+
+    fig2, ax2 = plt.subplots(figsize=(8, 8), constrained_layout=True)
+    sns.heatmap(last_mat, ax=ax2, cmap="RdBu_r", center=0,
+                vmin=-limit, vmax=limit,
+                cbar=True, cbar_kws={"shrink": 0.3}, square=True)
+    ax2.set_title(last_case, fontsize=14)
+    ax2.set_xlabel("Head Index")
+    ax2.set_ylabel("Layer Index")
+    ax2.set_yticks(np.arange(num_layers) + 0.5)
+    ax2.set_yticklabels(layers, rotation=0)
+
+    solo_path = Path(data_path).with_name(Path(data_path).stem + "_final.png")
+    fig2.savefig(solo_path, dpi=300)
+    print(f"Saved standalone final plot to {solo_path}")
+    solo_pdf = str(solo_path).replace(".png", ".pdf")
+    fig2.savefig(solo_pdf)
+    print(f"Saved standalone final PDF to {solo_pdf}")
+    plt.close(fig2)
 
 if __name__ == "__main__":
     main()
