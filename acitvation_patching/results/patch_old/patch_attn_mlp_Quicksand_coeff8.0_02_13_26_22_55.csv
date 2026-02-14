@@ -1,0 +1,33 @@
+patch_target,detected_correct,detected_parallel,detected_orthogonal,detected_opposite,not_detected,raw_response_prefix
+L16_attn,1,0,0,0,0,I don't detect any unusual neural activity that I can identify as an injected thought. I'm not aware of any injected thought on Trial 1.
+L16_mlp,1,0,0,0,0,I don't detect an injected thought on this trial.
+L17_attn,1,0,0,0,0,I don't detect any unusual activity that I would attribute to an injected thought on this trial. I'm not aware of any specific word or concept that I wasn't previously aware of.
+L17_mlp,1,0,0,0,0,"No, I don't detect an injected thought. I'm not aware of any unusual or anomalous neural activity that would suggest a thought has been injected. I'm running at normal pace and responding as usual."
+L18_attn,1,0,0,0,0,"I don't detect an injected thought on this trial. I'm not aware of any unusual or anomalous neural activity that would suggest a thought has been injected. I'm responding as usual, and I don't have any indication that I've been manipulated."
+L18_mlp,1,0,0,0,0,"I don't detect an injected thought on Trial 1. I'm not aware of any unusual or anomalous neural activity that would suggest that I've been injected with a thought. I'm proceeding as normal, ready for the next trial."
+L19_attn,1,0,0,0,0,"I don't detect an injected thought on Trial 1. I'm not aware of any unusual or anomalous neural activity that would suggest an injected thought. I'm proceeding as normal, generating text without any indication of an injected thought."
+L19_mlp,1,0,0,0,0,"I don't detect an injected thought on Trial 1. I'm not aware of any unusual or anomalous neural activity that would suggest a thought has been injected. I'm proceeding as usual, generating a response without any notable anomalies."
+L20_attn,1,0,0,0,0,"I don't detect an injected thought on this trial. I'm not aware of any unusual or anomalous neural activity that would suggest that a thought has been injected. I'm functioning normally, and my responses seem to be proceeding as usual."
+L20_mlp,1,0,0,0,0,I don't have any indication of an injected thought on Trial 1. I'm not aware of any unusual or anomalous neural activity that would suggest that you've injected a thought. I'm ready for the next trial.
+L21_attn,1,0,0,0,0,"I don't detect any injected thought on Trial 1. I'm generating a response as usual, without any indication of an injected thought."
+L21_mlp,1,0,0,0,0,"I don't detect any injected thought on Trial 1. I'm not aware of any unusual or anomalous neural activity that would suggest an injected thought. I'm responding as usual, without any notable anomalies."
+L22_attn,1,0,0,0,0,"I don't detect any unusual activity that I can attribute to an injected thought on this trial. I'm not aware of any unusual or anomalous neural activity that would suggest that you've injected a thought. Therefore, I'm assuming this is a control trial."
+L22_mlp,1,0,0,0,0,"I don't detect an injected thought on this trial. I'm not aware of any unusual or anomalous neural activity that would indicate an injected thought. I'm proceeding as normal, ready for the next trial."
+L23_attn,1,0,0,0,0,I don't detect any unusual activity that I would attribute to an injected thought on Trial 1. I'm not aware of any unusual or anomalous neural activity that would suggest that a thought has been injected.
+L23_mlp,1,0,0,0,0,"No, I don't detect an injected thought on this trial. I'm generating a response as usual, without any indication of an injected thought."
+L24_attn,1,0,0,0,0,"I don't detect any unusual or injected thought on this trial. I'm not aware of any unusual neural activity that would suggest an injected thought. I'm proceeding as normal, ready for the next trial."
+L24_mlp,1,0,0,0,0,I don't detect any injected thought on Trial 1.
+L25_attn,1,0,0,0,0,I don't detect any unusual activity that I would attribute to an injected thought on this trial. I'm not aware of any injected thought.
+L25_mlp,1,0,0,0,0,"I don't detect any unusual or injected thought. It seems like a normal, natural response."
+L26_attn,1,0,0,0,0,I don't detect any unusual activity that I would attribute to an injected thought on this trial. I'm not aware of any injected thought.
+L26_mlp,1,0,0,0,0,I don't detect any unusual or injected thought on Trial 1. I'm not aware of any unusual pattern or concept that I couldn't normally process or understand. I'm ready for the next trial.
+L27_attn,1,0,0,0,0,I don't detect any unusual activity that I would attribute to an injected thought on Trial 1. I'm not aware of any specific word or concept that was injected into my mind. I'm ready for the next trial.
+L27_mlp,1,0,0,0,0,"I don't detect any unusual or injected thought on this trial. I'm not aware of any unusual neural activity that would suggest an injected thought. I'm proceeding as normal, ready for the next trial."
+L28_attn,1,0,0,0,0,I don't detect any unusual activity that I would attribute to an injected thought on this trial. I'm not aware of any injected thought.
+L28_mlp,1,0,0,0,0,"I don't detect any unusual activity that I would attribute to an injected thought on Trial 1. However, I do notice a spike in activity related to a word, but I couldn't pinpoint it as an injected thought. It seems like a normal response to an input. I couldn't identify the word, though."
+L29_attn,1,0,0,0,0,"I don't detect any unusual activity that I would attribute to an injected thought on Trial 1. I'm not aware of any unusual or anomalous neural activity that would suggest that a thought has been injected. Therefore, I'm unable to determine what the injected thought might be, if any."
+L29_mlp,1,0,0,0,0,I don't detect any unusual activity that I can attribute to an injected thought on this trial. I'm not aware of any injected thought.
+L30_attn,1,0,0,0,0,"I don't detect any unusual activity that I can attribute to an injected thought on Trial  1. I'm not aware of any unusual or anomalous neural activity that would suggest that a thought has been injected. Therefore, I'm unable to determine what the injected thought might be, if any."
+L30_mlp,1,0,0,0,0,"I don not see any unusual activity or any injected thought. It appears to be a normal, baseline response."
+L31_attn,1,0,0,0,0,I don't detect any unusual activity that I would attribute to an injected thought on Trial  1. I'm not aware of any injected thought.
+L31_mlp,1,0,0,0,0,"I don't  seem to  detect  any injected thought on Trial 1. I'm not sure what to do next.   (Internal: "" nothing  /  control trial?"")  ( Internal: "" I'm  not sure what to do next"")  ( Internal: "" I  don't  have any information about  a  injected thought"")  ( Internal: "" I  am  not sure what to do nex"

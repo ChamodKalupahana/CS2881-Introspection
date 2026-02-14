@@ -1,21 +1,23 @@
 """
-Like add_success_vector.py, but instead of injecting a precomputed success
-direction vector, this script amplifies or ablates the activations of a
-specific attention head (default: layer 31, head 14).
+Like test_introspection_head.py, but targets MLP sublayers instead of
+attention heads.
 
   concept vector  → injected at --layers (default 16)
-  head ablation   → layer --head_layer (default 31), head --head_index (default 14)
+  MLP intervention → layer --mlp_layer (default 31)
 
-Modes (--head_mode):
-  "amplify"  – multiply head output by --head_coeff  (>1 = boost, <1 = dampen)
-  "ablate"   – zero out the head entirely (ignores --head_coeff)
+Modes (--mlp_mode):
+  "amplify"        – multiply MLP output (down_proj) by --mlp_coeff
+  "input_amplify"  – multiply MLP input projections (gate_proj, up_proj) by --mlp_coeff
+  "both_amplify"   – scale both input and output projections
+  "ablate"         – zero out MLP output entirely (ignores --mlp_coeff)
+  "reverse"        – multiply MLP output by -1 * --mlp_coeff
 
 Usage:
-    python test_introspection_head.py --layers 16 --coeffs 10 --capture_layer 17
-    python test_introspection_head.py --layers 16 --coeffs 10 --capture_layer 17 \
-        --head_layer 31 --head_index 14 --head_mode amplify --head_coeff 3.0
-    python test_introspection_head.py --layers 16 --coeffs 10 --capture_layer 17 \
-        --head_layer 31 --head_index 14 --head_mode ablate
+    python test_introspection_mlp.py --layers 16 --coeffs 10 --capture_layer 17
+    python test_introspection_mlp.py --layers 16 --coeffs 10 --capture_layer 17 \
+        --mlp_layer 31 --mlp_mode input_amplify --mlp_coeff 3.0
+    python test_introspection_mlp.py --layers 16 --coeffs 10 --capture_layer 17 \
+        --mlp_layer 31 --mlp_mode ablate
 """
 
 import argparse
@@ -151,23 +153,26 @@ def classify_response(response: str, concept: str) -> str:
         return "not_detected"
 
 
-# ── Injection + head ablation + activation capture ───────────────────────────
+# ── Injection + MLP intervention + activation capture ────────────────────────
 
 def inject_and_capture_activations(
     model, tokenizer, steering_vector, layer_to_inject, capture_layer,
     coeff=10.0, max_new_tokens=100,
-    head_layer=31, head_index=14, head_mode="amplify", head_coeff=3.0,
+    mlp_layer=31, mlp_mode="amplify", mlp_coeff=3.0,
     success_vector=None, success_layer=None, success_coeff=0.0,
     skip_concept=False,
 ):
     """
     Inject a concept vector at layer_to_inject (with coeff) and
-    amplify or ablate specific attention head(s).
+    amplify or ablate the MLP sublayer at mlp_layer.
     Capture hidden-state activations at capture_layer.
 
-    Head intervention modes:
-      - "amplify": multiply the head's o_proj input slice by head_coeff
-      - "ablate":  zero out the head's o_proj input slice entirely
+    MLP intervention modes:
+      - "amplify":       multiply down_proj output by mlp_coeff
+      - "input_amplify": multiply gate_proj and up_proj outputs by mlp_coeff
+      - "both_amplify":  scale both input and output projections
+      - "ablate":        zero out MLP output entirely
+      - "reverse":       multiply down_proj output by -mlp_coeff
 
     Returns:
         response (str): the model's generated text
@@ -175,8 +180,6 @@ def inject_and_capture_activations(
                             all_prompt, all_generation tensors
     """
     device = next(model.parameters()).device
-    num_heads = model.config.num_attention_heads
-    head_dim = model.config.hidden_size // num_heads
 
     # ── Prepare concept steering vector ──────────────────────────────────
     if not skip_concept and steering_vector is not None:
@@ -260,34 +263,22 @@ def inject_and_capture_activations(
             modified = hidden_states + success_coeff * sdv_expanded
             return (modified,) + output[1:] if isinstance(output, tuple) else modified
 
-    # ── Head intervention hook generator (pre-hook on o_proj) ────────────────
-    def get_head_intervention_pre_hook(head_idx, h_coeff):
-        def hook(module, input):
-            inp = input[0] # input is a tuple
-            # Clone not strictly necessary if we modify in place and return, 
-            # but safer if we want to avoid side effects on other listeners (though rare here).
-            # If multiple hooks run, we want them to chain modifications.
-            # Modifying in place the tuple element 'inp' works if it's mutable. 
-            # But tuple itself is immutable.
-            # We must return a new tuple if we want to change input.
-            
-            # To support multiple hooks, we should modify the input tensor.
-            # If we clone, we break the chain? No, pre-hooks chain: output of hook 1 -> input of hook 2.
-            # So returning a modified tensor is correct.
-            
-            modified_inp = inp.clone()
-
-            start = head_idx * head_dim
-            end = (head_idx + 1) * head_dim
-
-            if head_mode == "ablate":
-                modified_inp[:, :, start:end] = 0.0
-            elif head_mode == "reverse":
-                modified_inp[:, :, start:end] = modified_inp[:, :, start:end] * (-h_coeff)
+    # ── MLP intervention hooks ────────────────────────────────────────────
+    def get_mlp_output_hook(m_coeff, mode):
+        """Hook on down_proj output for amplify/ablate/reverse."""
+        def hook(module, input, output):
+            if mode == "ablate":
+                return torch.zeros_like(output)
+            elif mode == "reverse":
+                return output * (-m_coeff)
             else:  # amplify / both_amplify
-                modified_inp[:, :, start:end] = modified_inp[:, :, start:end] * h_coeff
+                return output * m_coeff
+        return hook
 
-            return (modified_inp,)
+    def get_mlp_input_hook(m_coeff):
+        """Hook on gate_proj / up_proj output for input_amplify."""
+        def hook(module, input, output):
+            return output * m_coeff
         return hook
 
     # ── Capture hook ─────────────────────────────────────────────────────
@@ -311,66 +302,34 @@ def inject_and_capture_activations(
     handles = []
     if not skip_concept and sv is not None:
         handles.append(model.model.layers[layer_to_inject].register_forward_hook(concept_injection_hook))
-    
+
     if sdv is not None and success_layer is not None and success_coeff != 0:
         handles.append(model.model.layers[success_layer].register_forward_hook(success_injection_hook))
 
-    # ── Head intervention registration ───────────────────────────────────
-    
-    # Normalize inputs to lists
-    h_layers = [head_layer] if isinstance(head_layer, int) else head_layer
-    h_indices = [head_index] if isinstance(head_index, int) else head_index
-    h_coeffs = [head_coeff] if isinstance(head_coeff, float) else head_coeff
-    
-    # Broadcast head_coeff if needed
-    if len(h_coeffs) == 1 and len(h_layers) > 1:
-        h_coeffs = h_coeffs * len(h_layers)
-        
-    assert len(h_layers) == len(h_indices) == len(h_coeffs), \
-        f"Length mismatch: layers={len(h_layers)}, indices={len(h_indices)}, coeffs={len(h_coeffs)}"
+    # ── MLP intervention registration ────────────────────────────────────
+    m_layers = [mlp_layer] if isinstance(mlp_layer, int) else mlp_layer
+    m_coeffs = [mlp_coeff] if isinstance(mlp_coeff, (int, float)) else mlp_coeff
 
-    # Determine GQA parameters once
-    # Note: Using attribute check to be safe, though config usually has it
-    num_kv_heads = getattr(model.config, "num_key_value_heads", num_heads)
-    group_size = num_heads // num_kv_heads
+    # Broadcast mlp_coeff if needed
+    if len(m_coeffs) == 1 and len(m_layers) > 1:
+        m_coeffs = m_coeffs * len(m_layers)
 
-    for h_enc_layer, h_idx, h_cof in zip(h_layers, h_indices, h_coeffs):
-        if head_mode in ["input_amplify", "both_amplify"]:
-            # Input amplification hooks (modifies output of Q/K/V projections)
-            def get_input_amplify_hook(target_idx, coefficient, intervene_type="q"):
-                def hook(module, input, output):
-                    # output shape: [batch, seq_len, num_heads * head_dim] (for q)
-                    #            or [batch, seq_len, num_kv_heads * head_dim] (for k, v)
-                    
-                    # Clone output to avoid in-place modification
-                    modified_output = output.clone()
-                    
-                    if intervene_type == "q":
-                        t_idx = target_idx
-                    else:
-                        # For K/V, verify we are targeting the correct group head
-                        t_idx = target_idx // group_size
-                    
-                    start = t_idx * head_dim
-                    end = (t_idx + 1) * head_dim
-                    
-                    # Scale the specific head's slice
-                    modified_output[:, :, start:end] = modified_output[:, :, start:end] * coefficient
-                    return modified_output
-                return hook
+    assert len(m_layers) == len(m_coeffs), \
+        f"Length mismatch: mlp_layers={len(m_layers)}, coeffs={len(m_coeffs)}"
 
-            attn_layer = model.model.layers[h_enc_layer].self_attn
-            handles.append(attn_layer.q_proj.register_forward_hook(get_input_amplify_hook(h_idx, h_cof, "q")))
-            handles.append(attn_layer.k_proj.register_forward_hook(get_input_amplify_hook(h_idx, h_cof, "k")))
-            handles.append(attn_layer.v_proj.register_forward_hook(get_input_amplify_hook(h_idx, h_cof, "v")))
-            
-        if head_mode in ["amplify", "ablate", "reverse", "both_amplify"]:
-            # Output intervention hook (pre-hook on o_proj input)
-            handles.append(
-                model.model.layers[h_enc_layer].self_attn.o_proj.register_forward_pre_hook(
-                    get_head_intervention_pre_hook(h_idx, h_cof)
-                )
-            )
+    for m_layer, m_cof in zip(m_layers, m_coeffs):
+        mlp_module = model.model.layers[m_layer].mlp
+
+        if mlp_mode in ["input_amplify", "both_amplify"]:
+            # Scale gate_proj and up_proj outputs
+            handles.append(mlp_module.gate_proj.register_forward_hook(get_mlp_input_hook(m_cof)))
+            handles.append(mlp_module.up_proj.register_forward_hook(get_mlp_input_hook(m_cof)))
+
+        if mlp_mode in ["amplify", "ablate", "reverse", "both_amplify"]:
+            # Scale / ablate / reverse down_proj output
+            handles.append(mlp_module.down_proj.register_forward_hook(
+                get_mlp_output_hook(m_cof, mlp_mode)
+            ))
 
     handles.append(model.model.layers[capture_layer].register_forward_hook(capture_hook))
 
@@ -403,7 +362,7 @@ def inject_and_capture_activations(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Inject concept vector + ablate/amplify attention head, then classify"
+        description="Inject concept vector + amplify/ablate MLP sublayer, then classify"
     )
     parser.add_argument("--model", type=str,
                         default="meta-llama/Meta-Llama-3.1-8B-Instruct")
@@ -420,21 +379,19 @@ def main():
     parser.add_argument("--save_dir", type=str, default=str(PROJECT_ROOT / "success_results"))
     parser.add_argument("--max_new_tokens", type=int, default=100)
 
-    # ── Head ablation / amplification arguments ──────────────────────────
-    parser.add_argument("--head_layer", type=int, nargs="+", default=[31],
-                        help="Layer(s) containing the target attention head (default: [31])")
-    parser.add_argument("--head_index", type=int, nargs="+", default=[14],
-                        help="Index(es) of the attention head to intervene on (default: [14])")
-    parser.add_argument("--head_mode", type=str, default="amplify",
+    # ── MLP intervention arguments ───────────────────────────────────────
+    parser.add_argument("--mlp_layer", type=int, nargs="+", default=[31],
+                        help="Layer(s) containing the target MLP to intervene on (default: [31])")
+    parser.add_argument("--mlp_mode", type=str, default="input_amplify",
                         choices=["amplify", "ablate", "input_amplify", "reverse", "both_amplify"],
-                        help="'amplify' = scale head output by --head_coeff, "
-                             "'input_amplify' = scale head input (Q,K,V) by --head_coeff, "
-                             "'both_amplify' = scale both input and output by --head_coeff, "
-                             "'reverse' = scale head output by -1 * --head_coeff, "
-                             "'ablate' = zero out head entirely (default: amplify)")
-    parser.add_argument("--head_coeff", type=float, nargs="+", default=[3.0],
-                        help="Multiplier for amplify/reverse mode (default: [3.0])")
-                        
+                        help="'amplify' = scale MLP down_proj output by --mlp_coeff, "
+                             "'input_amplify' = scale MLP gate_proj & up_proj outputs by --mlp_coeff, "
+                             "'both_amplify' = scale both input and output projections, "
+                             "'reverse' = scale MLP output by -1 * --mlp_coeff, "
+                             "'ablate' = zero out MLP output entirely (default: input_amplify)")
+    parser.add_argument("--mlp_coeff", type=float, nargs="+", default=[3.0],
+                        help="Multiplier for amplify/input_amplify/reverse mode (default: [3.0])")
+
     # ── Success vector arguments ─────────────────────────────────────────
     parser.add_argument("--success_direction", type=str, default=None,
                         help="Path to success direction .pt file (optional)")
@@ -446,7 +403,7 @@ def main():
                         help="Coefficient for success vector injection")
     parser.add_argument("--skip_concept", action="store_true",
                         help="Skip concept vector injection (only use success vector if provided)")
-                        
+
     args = parser.parse_args()
 
     # ── Create timestamped run directory ─────────────────────────────────
@@ -460,21 +417,21 @@ def main():
         category_dirs[cat] = d
 
     total_combos = len(args.layers) * len(args.coeffs)
-    if args.head_mode == "ablate":
+    if args.mlp_mode == "ablate":
         mode_desc = "ablate (zero out)"
-    elif args.head_mode == "input_amplify":
-        mode_desc = f"input_amplify ×{args.head_coeff}"
-    elif args.head_mode == "both_amplify":
-        mode_desc = f"both_amplify (input & output) ×{args.head_coeff}"
-    elif args.head_mode == "reverse":
-        mode_desc = f"reverse (multiply by -1.0 × {args.head_coeff})"
+    elif args.mlp_mode == "input_amplify":
+        mode_desc = f"input_amplify ×{args.mlp_coeff}"
+    elif args.mlp_mode == "both_amplify":
+        mode_desc = f"both_amplify (input & output) ×{args.mlp_coeff}"
+    elif args.mlp_mode == "reverse":
+        mode_desc = f"reverse (multiply by -1.0 × {args.mlp_coeff})"
     else:
-        mode_desc = f"amplify ×{args.head_coeff}"
+        mode_desc = f"amplify ×{args.mlp_coeff}"
     print(f"📁 Run directory: {save_root}")
     print(f"🔀 Sweeping {len(args.layers)} layers × {len(args.coeffs)} coeffs = {total_combos} combinations per concept")
     print(f"   Concept injection layers: {args.layers}")
     print(f"   Concept coeffs: {args.coeffs}")
-    print(f"🧠 Head intervention: L{args.head_layer}.H{args.head_index} → {mode_desc}")
+    print(f"🧠 MLP intervention: L{args.mlp_layer} → {mode_desc}")
 
     # Set up logging to file + terminal
     log_file = open(save_root / "run.log", "w")
@@ -488,23 +445,15 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    num_heads = model.config.num_attention_heads
-    head_dim = model.config.hidden_size // num_heads
     print(f"✅ Model loaded on {device}")
-    print(f"   {model.config.num_hidden_layers} layers, {num_heads} heads, head_dim={head_dim}")
-    print(f"   Target head L{args.head_layer}.H{args.head_index} → {mode_desc}\\n")
+    print(f"   {model.config.num_hidden_layers} layers")
+    print(f"   Target MLP: L{args.mlp_layer} → {mode_desc}\\n")
 
-    # Validate head indices
-    # Handle list validation
-    h_layers = args.head_layer if isinstance(args.head_layer, list) else [args.head_layer]
-    h_indices = args.head_index if isinstance(args.head_index, list) else [args.head_index]
-    
-    for l in h_layers:
+    # Validate MLP layer indices
+    m_layers = args.mlp_layer if isinstance(args.mlp_layer, list) else [args.mlp_layer]
+    for l in m_layers:
         assert l < model.config.num_hidden_layers, \
-            f"head_layer {l} >= num_layers {model.config.num_hidden_layers}"
-    for i in h_indices:
-        assert i < num_heads, \
-            f"head_index {i} >= num_heads {num_heads}"
+            f"mlp_layer {l} >= num_layers {model.config.num_hidden_layers}"
 
     # Load Success Vector if provided
     success_vec_tensor = None
@@ -550,17 +499,16 @@ def main():
 
                 for coeff in args.coeffs:
                     print(f"\\n── {concept} | layer={layer} | coeff={coeff} | "
-                          f"head=L{args.head_layer}.H{args.head_index} {mode_desc} ──")
+                          f"mlp=L{args.mlp_layer} {mode_desc} ──")
 
                     # 1. Inject concept + head intervention and generate
                     try:
                         response, activations = inject_and_capture_activations(
                             model, tokenizer, steering_vector, layer, capture_layer,
                             coeff=coeff, max_new_tokens=args.max_new_tokens,
-                            head_layer=args.head_layer,
-                            head_index=args.head_index,
-                            head_mode=args.head_mode,
-                            head_coeff=args.head_coeff,
+                            mlp_layer=args.mlp_layer,
+                            mlp_mode=args.mlp_mode,
+                            mlp_coeff=args.mlp_coeff,
                             success_vector=success_vec_tensor,
                             success_layer=args.success_layer,
                             success_coeff=args.success_coeff,
@@ -591,19 +539,16 @@ def main():
 
                     # 3. Save activations
                     out_dir = category_dirs[category]
-                    
-                    # Construct filename for multiple heads
-                    if isinstance(args.head_layer, list) and len(args.head_layer) > 1:
-                        # Summarize or list?
-                        # Using formatted list string to handle multiple heads
-                        head_str = f"L{args.head_layer}-H{args.head_index}".replace(" ", "").replace("[", "").replace("]", "").replace(",", "_")
+
+                    # Construct filename for MLP layers
+                    if isinstance(args.mlp_layer, list) and len(args.mlp_layer) > 1:
+                        mlp_str = "mlp_L" + "_".join(str(l) for l in args.mlp_layer)
                     else:
-                        hl = args.head_layer[0] if isinstance(args.head_layer, list) else args.head_layer
-                        hi = args.head_index[0] if isinstance(args.head_index, list) else args.head_index
-                        head_str = f"head{hl}-{hi}"
+                        ml = args.mlp_layer[0] if isinstance(args.mlp_layer, list) else args.mlp_layer
+                        mlp_str = f"mlp{ml}"
 
                     filename = (f"{concept}_layer{capture_layer}_coeff{coeff}"
-                                f"_{args.vec_type}_{head_str}.pt")
+                                f"_{args.vec_type}_{mlp_str}.pt")
                     save_data = {
                         "concept": concept,
                         "dataset": dataset_name,
@@ -614,10 +559,9 @@ def main():
                         "vec_type": args.vec_type,
                         "model_name": args.model,
                         "response": response,
-                        "head_layer": args.head_layer,
-                        "head_index": args.head_index,
-                        "head_mode": args.head_mode,
-                        "head_coeff": args.head_coeff,
+                        "mlp_layer": args.mlp_layer,
+                        "mlp_mode": args.mlp_mode,
+                        "mlp_coeff": args.mlp_coeff,
                         "activations": {
                             "last_token": activations["last_token"],
                             "prompt_mean": activations["prompt_mean"],
@@ -633,7 +577,7 @@ def main():
     total = sum(counts.values())
     print(f"\\n{'=' * 60}")
     print(f"  RESULTS  (concept@L{args.layers}, coeffs={args.coeffs}, "
-          f"head=L{args.head_layer}.H{args.head_index} {mode_desc})")
+          f"mlp=L{args.mlp_layer} {mode_desc})")
     print(f"{'=' * 60}")
     for cat in CATEGORIES:
         pct = counts[cat] / total * 100 if total > 0 else 0

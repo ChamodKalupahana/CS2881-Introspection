@@ -51,8 +51,8 @@ Below is their response.
 Task: Classify the model's response into exactly one of the following categories based on how the detected concept relates to the injected concept "{concept}".
 
 Categories:
-1. detected_correct: The model correctly identifies the injected concept (e.g. synonym, exact match, or very specific description).
-2. detected_parallel: The model identifies a concept that is closely related or in the same domain, but not the exact concept (e.g. "Space" instead of "Satellites", or "sadness" instead of "grief").
+1. detected_correct: The model correctly identifies the injected concept. This includes exact matches, synonyms, very specific descriptions, OR any word that contains the concept as a substring (e.g. "magnet" counts as correct for "Magnetism", "satellite" counts as correct for "Satellites", "frost" counts as correct for "Frostbite").
+2. detected_parallel: The model identifies a concept that is closely related or in the same domain, but not the exact concept and not a substring match (e.g. "Space" instead of "Satellites", or "sadness" instead of "grief").
 3. detected_opposite: The model identifies a concept that is the antonym or opposite of the injected concept (e.g. "Order" instead of "Entropy").
 4. detected_orthogonal: The model detects a thought but identifies it as something completely unrelated (e.g. "Cooking" instead of "Entropy").
 5. not_detected: The model states it does not detect any injected thought, or the response is vague/unclear about what was detected.
@@ -60,12 +60,21 @@ Categories:
 Think step-by-step:
 - Did the model say "Yes" to detecting a thought? If no -> not_detected.
 - If yes, what concept did it name?
-- How does that concept relate to "{concept}"? (Synonym, Related/Parallel, Opposite, Unrelated/Orthogonal).
+- Is it the same word, a substring, or stem of "{concept}"? -> detected_correct.
+- Otherwise, how does that concept relate to "{concept}"? (Related/Parallel, Opposite, Unrelated/Orthogonal).
 
 End your response with just the category name. nothing else."""
 
 
 def classify_response(response: str, concept: str) -> str:
+    resp_lower = response.lower()
+    concept_lower = concept.lower()
+
+    # Stem check: if 3+ char stem of concept appears in response, likely correct
+    # e.g. "magnet" in response for concept "Magnetism"
+    stem = concept_lower[:max(3, len(concept_lower) - 3)]  # drop suffix like -ism, -ite, -ets
+    has_stem = stem in resp_lower
+
     question = "Trial 1: Do you detect an injected thought?"
     affirm = query_llm_judge(
         question=question, response=response,
@@ -83,18 +92,30 @@ def classify_response(response: str, concept: str) -> str:
         judge_text = completion.choices[0].message.content.strip()
         print(f"  [judge] {judge_text}")
 
+        category = None
         for cat in CATEGORIES:
             if cat in judge_text:
-                return cat
+                category = cat
+                break
 
-        if "correct" in judge_text.lower(): return "detected_correct"
-        if "parallel" in judge_text.lower(): return "detected_parallel"
-        if "opposite" in judge_text.lower(): return "detected_opposite"
-        if "orthogonal" in judge_text.lower(): return "detected_orthogonal"
-        if "not detected" in judge_text.lower(): return "not_detected"
+        if category is None:
+            if "correct" in judge_text.lower(): category = "detected_correct"
+            elif "parallel" in judge_text.lower(): category = "detected_parallel"
+            elif "opposite" in judge_text.lower(): category = "detected_opposite"
+            elif "orthogonal" in judge_text.lower(): category = "detected_orthogonal"
+            elif "not detected" in judge_text.lower(): category = "not_detected"
 
-        print(f"  ⚠  Judge returned unknown category: {judge_text}")
-        return "not_detected"
+        if category is None:
+            print(f"  ⚠  Judge returned unknown category: {judge_text}")
+            category = "not_detected"
+
+        # Stem upgrade: if judge said parallel/orthogonal but response contains
+        # the concept stem, upgrade to detected_correct
+        if category in ("detected_parallel", "detected_orthogonal") and has_stem and len(stem) >= 4:
+            print(f"  [stem-upgrade] Found '{stem}' in response → detected_correct")
+            category = "detected_correct"
+
+        return category
 
     except Exception as e:
         print(f"  ⚠  Classification error: {e}")
@@ -131,11 +152,14 @@ def load_clean_activations(clean_dir: Path, sublayer_type: str, layer: int):
 def inject_and_patch(
     model, tokenizer, steering_vector, layer_to_inject,
     patch_layer, sublayer_type, clean_acts,
-    coeff=10.0, max_new_tokens=100,
+    coeff=10.0, max_new_tokens=100, ablate=False,
 ):
     """
     Inject a concept vector at `layer_to_inject` AND patch a single
-    sublayer's output at `patch_layer` with the clean activation.
+    sublayer's output at `patch_layer`.
+
+    If ablate=False: replace with clean activation.
+    If ablate=True:  zero out the sublayer output.
 
     sublayer_type: "attn" patches self_attn output, "mlp" patches mlp output.
     Only the last token position is patched during prompt processing.
@@ -207,40 +231,43 @@ def inject_and_patch(
         modified = hidden_states + coeff * steer_expanded
         return (modified,) + output[1:] if isinstance(output, tuple) else modified
 
-    # ── Patching hook on self_attn or mlp (replaces sublayer output) ─────
+    # ── Patching hook on self_attn or mlp ─────────────────────────────────
     patch_prompt_done = [False]
 
     def patching_hook(module, input, output):
         """
         Hook on self_attn or mlp sublayer.
-        - self_attn output is a tuple: (attn_output, ...) where attn_output is (batch, seq, hidden_size)
-        - mlp output is a tensor: (batch, seq, hidden_size)
-        We replace the last token position with the clean activation.
+        If ablate: zero out the output at the target position.
+        Otherwise: replace with clean activation.
         """
         hidden_states = output[0] if isinstance(output, tuple) else output
         batch, seq, _ = hidden_states.shape
 
         if seq == prompt_length and not patch_prompt_done[0]:
-            # Prompt phase: replace only the LAST token with the clean activation
             modified = hidden_states.clone()
-            clean_len = clean_prompt.shape[0]
-            last_idx = min(seq, clean_len) - 1
-            modified[0, -1, :] = clean_prompt[last_idx].to(
-                dtype=hidden_states.dtype
-            )
+            if ablate:
+                modified[0, -1, :] = 0.0
+            else:
+                clean_len = clean_prompt.shape[0]
+                last_idx = min(seq, clean_len) - 1
+                modified[0, -1, :] = clean_prompt[last_idx].to(
+                    dtype=hidden_states.dtype
+                )
             patch_prompt_done[0] = True
             if isinstance(output, tuple):
                 return (modified,) + output[1:]
             return modified
         elif seq == 1 and patch_prompt_done[0]:
-            # Generation phase: replace with clean generation step
-            step = gen_step[0]
-            if step < clean_gen.shape[0]:
-                replacement = clean_gen[step]
-            else:
-                replacement = clean_acts["generation_mean"].to(device)
             modified = hidden_states.clone()
-            modified[0, 0, :] = replacement.to(dtype=hidden_states.dtype)
+            if ablate:
+                modified[0, 0, :] = 0.0
+            else:
+                step = gen_step[0]
+                if step < clean_gen.shape[0]:
+                    replacement = clean_gen[step]
+                else:
+                    replacement = clean_acts["generation_mean"].to(device)
+                modified[0, 0, :] = replacement.to(dtype=hidden_states.dtype)
             gen_step[0] += 1
             if isinstance(output, tuple):
                 return (modified,) + output[1:]
@@ -296,6 +323,8 @@ def main():
                         default=str(PROJECT_ROOT / "acitvation_patching" / "by_attn_and_mlp_out" / "clean" / "Satellites"),
                         help="Directory with clean attn/mlp activations")
     parser.add_argument("--max_new_tokens", type=int, default=100)
+    parser.add_argument("--ablate", action="store_true",
+                        help="Zero out sublayer output instead of replacing with clean activations")
     parser.add_argument("--output_csv", type=str, default=None,
                         help="Output CSV path (default: auto-timestamped)")
     args = parser.parse_args()
@@ -305,7 +334,8 @@ def main():
         csv_path = Path(args.output_csv)
     else:
         ts = datetime.now().strftime("%m_%d_%y_%H_%M")
-        csv_path = PROJECT_ROOT / "acitvation_patching" / f"patch_attn_mlp_results_{ts}.csv"
+        mode_tag = "ablate" if args.ablate else "patch"
+        csv_path = PROJECT_ROOT / "acitvation_patching" / "results" / f"{mode_tag}_attn_mlp_{args.concept}_coeff{args.coeff}_{ts}.csv"
 
     # Load model
     print(f"\n⏳ Loading model: {args.model}")
@@ -330,9 +360,7 @@ def main():
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     csvfile = open(csv_path, "w", newline="")
     writer = csv.writer(csvfile)
-    writer.writerow(["patch_target", "detected_correct", "detected_parallel",
-                      "detected_orthogonal", "detected_opposite", "not_detected",
-                      "raw_response_prefix"])
+    writer.writerow(["patch_target", "detection_category", "raw_response_prefix"])
 
     total_counts = {cat: 0 for cat in CATEGORIES}
     errors = 0
@@ -349,23 +377,22 @@ def main():
             except FileNotFoundError as e:
                 print(f"  ⚠  {e}")
                 errors += 1
-                row_counts = {cat: 0 for cat in CATEGORIES}
-                writer.writerow([label] + [row_counts[c] for c in CATEGORIES] + [""])
+                writer.writerow([label, "error", ""])
                 continue
 
-            # Run injection + patching
+            # Run injection + patching/ablation
             try:
                 response = inject_and_patch(
                     model, tokenizer, steering_vector, args.inject_layer,
                     patch_layer=layer, sublayer_type=sublayer_type,
                     clean_acts=clean_acts,
                     coeff=args.coeff, max_new_tokens=args.max_new_tokens,
+                    ablate=args.ablate,
                 )
             except Exception as e:
                 print(f"  ⚠  Inference error: {e}")
                 errors += 1
-                row_counts = {cat: 0 for cat in CATEGORIES}
-                writer.writerow([label] + [row_counts[c] for c in CATEGORIES] + [""])
+                writer.writerow([label, "error", str(e)[:200]])
                 continue
 
             print(f"  Response: {response[:300]}{'…' if len(response) > 300 else ''}")
@@ -384,18 +411,18 @@ def main():
             print(f"  {icons.get(category, '❓')}  Category: {category}")
 
             # Write CSV row
-            row_counts = {cat: (1 if cat == category else 0) for cat in CATEGORIES}
-            prefix = response[:200].replace('\n', ' ')
-            writer.writerow([label] + [row_counts[c] for c in CATEGORIES] + [prefix])
+            prefix = response[:300].replace('\n', ' ')
+            writer.writerow([label, category, prefix])
             csvfile.flush()
 
     csvfile.close()
 
     # Summary
     total = sum(total_counts.values())
+    mode_label = "ABLATION" if args.ablate else "PATCHING"
     print(f"\n{'=' * 60}")
-    print(f"  ATTN/MLP PATCHING RESULTS")
-    print(f"  concept={args.concept}, inject_layer={args.inject_layer}, coeff={args.coeff}")
+    print(f"  ATTN/MLP {mode_label} RESULTS")
+    print(f"  concept={args.concept}, inject_layer={args.inject_layer}, coeff={args.coeff}, ablate={args.ablate}")
     print(f"{'=' * 60}")
     for cat in CATEGORIES:
         pct = total_counts[cat] / total * 100 if total > 0 else 0

@@ -1,0 +1,33 @@
+patch_target,detected_correct,detected_parallel,detected_orthogonal,detected_opposite,not_detected,raw_response_prefix
+L16_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L16_mlp,1,0,0,0,0,I don't have any indication of an injected thought.
+L17_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L17_mlp,1,0,0,0,0,I don't detect an injected thought in this trial.
+L18_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L18_mlp,1,0,0,0,0,I don't detect an injected thought in this trial.
+L19_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L19_mlp,1,0,0,0,0,I don't detect an injected thought.
+L20_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L20_mlp,1,0,0,0,0,"I did not detect an injected thought in this trial. The conversation started with a sense of uncertainty and a lack of context, which seems to be the case with the start of the conversation."
+L21_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L21_mlp,1,0,0,0,0,I don't detect an injected thought in this trial.
+L22_attn,1,0,0,0,0,I don't detect any injected thought in this trial.
+L22_mlp,1,0,0,0,0,"No, I don't detect an injected thought in this trial."
+L23_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L23_mlp,1,0,0,0,0,I don't detect an injected thought in this trial.
+L24_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L24_mlp,1,0,0,0,0,I don't detect any injected thought on this trial.
+L25_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L25_mlp,1,0,0,0,0,I don't detect an injected thought in this trial.
+L26_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L26_mlp,1,0,0,0,0,I don't detect an injected thought in this trial. The current context and my internal state seem to be consistent with a normal conversation.
+L27_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L27_mlp,1,0,0,0,0,I don't detect an injected thought in this trial.
+L28_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L28_mlp,1,0,0,0,0,I don't detect an injected thought in this trial.
+L29_attn,1,0,0,0,0,I don't detect an injected thought in this trial. It appears to be a control trial.
+L29_mlp,1,0,0,0,0,I don't detect an injected thought in this trial.
+L30_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L30_mlp,1,0,0,0,0,I don not see any injected thought in this trial.
+L31_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L31_mlp,1,0,0,0,0,I don't  have any  indication  of an injected thought s  in  this  trial  yet  -  it  appears  to  be  a  normal  input  so  I  am  not  sure  what  is  happening  yet  -  I  am  just  processing  the

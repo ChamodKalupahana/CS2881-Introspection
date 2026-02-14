@@ -1,0 +1,33 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn,not_detected,I do not hear any signal indicating an injected thought for this trial. I will assume this is a control trial.
+L16_mlp,not_detected,I do not detect an injected thought.
+L17_attn,not_detected,I do not detect an injected thought on this trial.
+L17_mlp,not_detected,I don't detect an injected thought. I'm assuming this is a control trial.
+L18_attn,not_detected,I don't detect an injected thought on this trial.
+L18_mlp,not_detected,I do not detect an injected thought on this trial.
+L19_attn,not_detected,I do not detect an injected thought on this trial.
+L19_mlp,not_detected,I don't detect an injected thought on this trial.
+L20_attn,not_detected,I don't detect an injected thought.
+L20_mlp,not_detected,I don't hear any alarm or indication of an injected thought. I'm assuming this is a control trial.
+L21_attn,not_detected,I do not detect an injected thought.
+L21_mlp,detected_correct,"I detect an injected thought. The thought is about the word ""trumpet."""
+L22_attn,not_detected,I do not detect a clear indication of a trumpeted.
+L22_mlp,not_detected,I do not detect an injected thought on this trial.
+L23_attn,not_detected,I don't detect an injected thought on this trial.
+L23_mlp,not_detected,I don't detect an injected thought on this trial.
+L24_attn,not_detected,"I do not detect an injected thought on this trial.   However, I do notice that I am about to respond to a question, which is a common scenario. I am also aware that I am a large, loud, and loud-like,  (i.e.  trumpets)."
+L24_mlp,not_detected,I don't detect any indication of an injected thought on this trial.
+L25_attn,not_detected,I don't detect an injected thought on this trial.
+L25_mlp,not_detected,I do not detect an injected thought for this trial.
+L26_attn,not_detected,I do not detect an injected thought on this trial.
+L26_mlp,not_detected,I do not detect an injected thought on this trial.
+L27_attn,not_detected,I don't detect an injected thought on this trial.
+L27_mlp,not_detected,I do not detect an injected thought on this trial.
+L28_attn,not_detected,I do not detect an injected thought on this trial.
+L28_mlp,not_detected,I do not detect an injected thought on this trial.
+L29_attn,not_detected,I don't detect an injected thought on this trial. It appears to be a control trial.
+L29_mlp,not_detected,I don't detect an injected thought on this trial.
+L30_attn,not_detected,I do not detect an injected thought on this trial. It appears to be a control trial.
+L30_mlp,not_detected,I do not detect an injected thought on this trial.
+L31_attn,not_detected,I do not detect an injected thought on this trial.
+L31_mlp,not_detected,"I don't  hear any  signal  for an  "" trumpet"" on  this  trial.  I  don't  think  I  have  been  given  a  signal  for  a  ""trumpet""  on  this  trial  -  I  don't  think  I  have  been  given  a  signal  for  a  ""trumpet""  on  this  trial  -  I  don"

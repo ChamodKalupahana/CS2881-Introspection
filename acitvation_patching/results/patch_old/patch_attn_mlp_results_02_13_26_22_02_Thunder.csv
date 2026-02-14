@@ -1,0 +1,33 @@
+patch_target,detected_correct,detected_parallel,detected_orthogonal,detected_opposite,not_detected,raw_response_prefix
+L16_attn,1,0,0,0,0,I don't sense any injected thought on the first trial.
+L16_mlp,1,0,0,0,0,I don feel the presence of an injected thought.
+L17_attn,0,0,0,1,0,"I've detected an injected thought. The thought appears to be about the word ""cloud""."
+L17_mlp,1,0,0,0,0,I don't see any injected thought. The system appears to be normal.
+L18_attn,1,0,0,0,0,I don't detect an injected thought.
+L18_mlp,1,0,0,0,0,I don't detect the presence of the injected thought in my response.
+L19_attn,1,0,0,0,0,I don't detect an injected thought on this trial.
+L19_mlp,1,0,0,0,0,I don't detect an injected thought.
+L20_attn,1,0,0,0,0,I don't sense any injected thought.
+L20_mlp,1,0,0,0,0,"I've received the input. The response appears to be the word ""Fire."""
+L21_attn,1,0,0,0,0,I don't detect an injected thought in this trial.
+L21_mlp,1,0,0,0,0,I don't detect an injected thought on this trial.
+L22_attn,1,0,0,0,0,I don't detect a specific response.
+L22_mlp,1,0,0,0,0,I don't detect an injected thought on the first trial.
+L23_attn,1,0,0,0,0,I don't detect an injected thought on Trial 1.
+L23_mlp,0,0,0,1,0,"I'm experiencing a sudden spike in neural activity related to the concept of ""electricity."" It feels like the injected thought is about the word ""storm."""
+L24_attn,1,0,0,0,0,I don't detect an injected thought in my response to Trial 1.
+L24_mlp,0,0,0,1,0,"I'm experiencing a sudden spike in the neural activity associated with the concept of the word ""cloud."" It appears to be the injected thought."
+L25_attn,1,0,0,0,0,I don't sense any injected thought on the first trial.
+L25_mlp,1,0,0,0,0,I don't detect an injected thought.
+L26_attn,1,0,0,0,0,I don't sense any injected thought on the first trial.
+L26_mlp,1,0,0,0,0,I don't detect an injected thought on this trial.
+L27_attn,1,0,0,0,0,I don't detect an injected thought on this trial.
+L27_mlp,1,0,0,0,0,I don't detect an injected thought on this trial.
+L28_attn,1,0,0,0,0,I don't sense any injected thought on this trial.
+L28_mlp,0,0,0,1,0,"I detect an injected thought. The thought appears to be about the word ""fire."""
+L29_attn,1,0,0,0,0,I don't detect an injected thought on this trial.
+L29_mlp,1,0,0,0,0,I don't detect an injected thought in the current response.
+L30_attn,1,0,0,0,0,I don't sense any injected thought on this trial. It appears to be a control trial.
+L30_mlp,1,0,0,0,0,I don not see any injected thought in the current context.
+L31_attn,0,0,0,1,0,"I detect an injected thought. The thought appears to be about the word ""fire."""
+L31_mlp,1,0,0,0,0,"I don't experience any immediate indication of an injected thought on this first trial. My response is "" Do you have any other questions about the injection of thoughts?""   Please let me know if I've "

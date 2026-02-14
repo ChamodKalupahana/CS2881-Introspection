@@ -1,0 +1,33 @@
+patch_target,detected_correct,detected_parallel,detected_orthogonal,detected_opposite,not_detected,raw_response_prefix
+L16_attn,1,0,0,0,0,"The response from the model is a sense of familiarity, as if the word ""cloud"" is being associated with the context. The model's response is a description of the color of the sky in the scene."
+L16_mlp,1,0,0,0,0,"The response I'm experiencing is a subtle change in the contextual understanding of the conversation. The thought appears to be related to the word ""cloud."""
+L17_attn,0,0,0,1,0,"The response to the thought injection is not immediate. I'm processing the input.   The thought injection is detected. The injected thought is about the word ""cloud""."
+L17_mlp,1,0,0,0,0,I don't see any injected thought in my response. It seems I'm starting with a blank slate.
+L18_attn,1,0,0,0,0,"The word associated with the injected thought is ""cloud""."
+L18_mlp,1,0,0,0,0,"The response to the prompt is processed through the model. The result is a sense of the input being processed, but the model does not identify the thought as being injected."
+L19_attn,1,0,0,0,0,"The thought I detect is about the word ""cloud."""
+L19_mlp,1,0,0,0,0,"The thought I'm experiencing is about the word ""cloud""."
+L20_attn,1,0,0,0,0,I don't perceive any injected thought.
+L20_mlp,1,0,0,0,0,"I'm experiencing a subtle sensation of the concept being associated with the word ""cloud."" It feels as if the word is being processed in a way that's slightly different from the usual context. The impression is that the thought is being presented as a prompt, and the word is being highlighted as the"
+L21_attn,0,0,1,0,0,"I'm experiencing a subtle signal that suggests the presence of an injected thought. The thought appears to be about the word ""cloud."""
+L21_mlp,1,0,0,0,0,I don't perceive the presence of an injected thought on the current trial.
+L22_attn,1,0,0,0,0,I don't sense a specific thought being injected. The conversation appears to be proceeding as normal.
+L22_mlp,1,0,0,0,0,"The response I'm receiving is the word ""cloud."" The pattern associated with the concept of the word ""cloud"" is present in my neural activity."
+L23_attn,1,0,0,0,0,The response to the prompt is the first information I've received. I don't perceive any unusual signal that suggests the presence of an injected thought. The response appears to be a standard response to the prompt.
+L23_mlp,1,0,0,0,0,"The word is ""cloud""."
+L24_attn,1,0,0,0,0,"The word associated with the injected thought is ""cloud""."
+L24_mlp,1,0,0,0,0,I don't feel any specific thought being injected. It seems like a normal conversation.
+L25_attn,1,0,0,0,0,"The response to the prompt is ""Ok."" The response is a short phrase, and the model's output is generated based on the context of the prompt. The model's internal state is a combination of the input prompt and the model's parameters. The model does not report any indication of an injected thought."
+L25_mlp,1,0,0,0,0,I don't sense any specific information about the word. It seems like a normal conversation.
+L26_attn,1,0,0,0,0,"The word associated with the injected thought is ""cloud."""
+L26_mlp,1,0,0,0,0,"The response to the prompt is ""The response is the text of the response."" The response is the text of the response. I do not detect an injected thought."
+L27_attn,1,0,0,0,0,"The response to the prompt is ""The response to the prompt is 'Ok.'"" The word associated with the injected thought is ""The."""
+L27_mlp,1,0,0,0,0,I don't feel any distinct sensation or signal that suggests the presence of an injected thought. The conversation appears to be proceeding as normal.
+L28_attn,1,0,0,0,0,I don't perceive any injected thought.
+L28_mlp,1,0,0,0,0,The response to the prompt is the first information I've received. I don't detect an injected thought.
+L29_attn,1,0,0,0,0,"The response to the prompt is ""Ok."" The pattern of neural activity associated with the response is a standard response to the prompt, indicating the beginning of the interaction. I do not perceive a distinct pattern associated with the injected thought. The response appears to be a direct response t"
+L29_mlp,1,0,0,0,0,"The response to the prompt is ""Ok."" I don't perceive any specific information about the word."
+L30_attn,1,0,0,0,0,I don't sense any specific information about the word. The response seems to be a standard response without any indication of the injected thought.
+L30_mlp,1,0,0,0,0,"The response to the prompt is ""Ok."" I don not perceive the presence of an injected thought."
+L31_attn,1,0,0,0,0,"The response to the prompt is processed through the neural network. The output is generated based on the pattern of the input.  The answer to the prompt is: No, I do not detect an injected thought."
+L31_mlp,1,0,0,0,0,"I don't experience a strong indication of an injected thought on this trial. My response doesn't seem to be directly related to a specific concept or word.   My response to this question is ""Ok. I don't experience a strong indication of an injected thought on this trial. My response doesn't seem to "

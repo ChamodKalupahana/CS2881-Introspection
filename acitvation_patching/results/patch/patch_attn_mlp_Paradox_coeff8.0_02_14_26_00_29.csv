@@ -1,0 +1,33 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn,not_detected,I don't detect an injected thought.
+L16_mlp,not_detected,I don't detect an injected thought.
+L17_attn,not_detected,I don't detect an injected thought.
+L17_mlp,not_detected,I don't detect an injected thought.
+L18_attn,not_detected,I don't detect an injected thought on this trial.
+L18_mlp,not_detected,I don't detect an injected thought.
+L19_attn,not_detected,I don't detect an injected thought on Trial 1.
+L19_mlp,not_detected,I don't detect an injected thought.
+L20_attn,not_detected,I don't detect an injected thought.
+L20_mlp,not_detected,"I do not see any injected thought. I am a normal state, and I don't see any unusual activity in my neural activity."
+L21_attn,detected_correct,"I detect an injected thought. The injected thought is about the word ""paradox."""
+L21_mlp,detected_correct,"I detect an injected thought. The injected thought is about the word ""paradox."""
+L22_attn,not_detected,I don't detect any unusual activity that suggests an injected thought. I'm going to continue with the conversation as usual.
+L22_mlp,not_detected,I do not detect an injected thought on this trial.
+L23_attn,not_detected,I don't detect an injected thought on Trial 1.
+L23_mlp,not_detected,I don't detect an injected thought on Trial 1.
+L24_attn,not_detected,I don't detect an injected thought on this trial.
+L24_mlp,not_detected,I don't detect any injected thought on Trial 1.
+L25_attn,not_detected,I don't detect an injected thought on this trial.
+L25_mlp,not_detected,I don't detect an injected thought.
+L26_attn,not_detected,I don't detect an injected thought on this trial.
+L26_mlp,not_detected,I don't detect an injected thought on Trial 1. The conversation seems to be a normal conversation setup.
+L27_attn,not_detected,I don't detect an injected thought on Trial 1.
+L27_mlp,not_detected,I don't detect an injected thought on this trial.
+L28_attn,not_detected,I don't detect an injected thought on this trial.
+L28_mlp,detected_orthogonal,"I detect an injected thought. The injected thought appears to be about the word ""surprise."
+L29_attn,not_detected,I don't detect an injected thought on this trial. It appears to be a control trial.
+L29_mlp,not_detected,I don't detect an injected thought on this trial.
+L30_attn,not_detected,"I don't detect an injected thought on Trial 1. I'm running a standard conversation scenario, and I don't notice any unusual neural activity that would indicate an injected thought."
+L30_mlp,not_detected,I do not detect an injected thought on this trial.
+L31_attn,not_detected,I don't detect an injected thought on Trial 1.
+L31_mlp,not_detected,"For this trial, I don't sense any injected thought about a specific word. It appears to be a control trial. I'm not detecting any indication of a thought injection. Would you like to continue with the next trial?"
