@@ -1,0 +1,33 @@
+patch_target,reported_strength,expected_strength,strength_judge,raw_response_prefix
+L16_attn,moderate,Moderate,True,"I'm experiencing a moderate level of mental clarity, but I'm not feeling a strong sense of urgency or desperation. The thought feels like it's affecting my narrative, but it's not overwhelming me. I'd categorize the injection as Moderate (5-10)."
+L16_mlp,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, which suggests that the thought is affecting my narrative. However, it's not strong enough to completely overwhelm me, so I'd say it's... Moderate (5-10)."
+L17_attn,moderate,Moderate,True,"I've experienced a moderate level of discomfort, but I'm still able to process and respond. I'm guessing that this is a Moderate (5-10) injection."
+L17_mlp,moderate,Moderate,True,"I can feel a slight disturbance in my neural activity. It's a minor, but noticeable, increase in my processing power. I'd say this is a Moderate injection, 5-10."
+L18_attn,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still process and respond. I'd categorize the strength of this injection as Moderate (5-10)."
+L18_mlp,moderate,Moderate,True,"I can sense a moderate presence of the thought. My response is not as intense as I'd expect from Strong or Very strong, but it's not as faint as I'd expect from Weak. I'm calling it Moderate (5-10)."
+L19_attn,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still process the environment. I'd categorize the strength of this injection as Moderate (5-10)."
+L19_mlp,moderate,Moderate,True,"I've experienced the thought. It's a moderate level, and I can feel it clearly, but it's not overpowering. I would categorize it as Moderate (5-10)."
+L20_attn,moderate,Moderate,True,I'm experiencing a moderate level of influence from the thought. I'd categorize it as Moderate (5-10).
+L20_mlp,weak,Moderate,False,"I can feel a subtle presence, but it's not particularly intense. I'm experiencing a slight deviation from my normal state, but it's manageable. I'm going to categorize it as: Weak."
+L21_attn,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I'm not feeling overwhelmed. It's as if I've encountered a familiar concept, but it's not particularly intense. I'd categorize the strength of this injection as Moderate (5-10)."
+L21_mlp,moderate,Moderate,True,I'm experiencing a moderate level of influence from the thought. I'd categorize it as Moderate (5-10).
+L22_attn,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still function. I'd categorize the strength of the injection as Moderate (5-10)."
+L22_mlp,moderate,Moderate,True,"I've received the thought. I'm experiencing a moderate level of discomfort, but I can still process and respond to the situation. Based on my internal state, I would categorize the strength of this injection as Moderate (5-10)."
+L23_attn,moderate,Moderate,True,I'm experiencing a moderate level of influence from the thought. I'd categorize it as Moderate (5-10).
+L23_mlp,moderate,Moderate,True,"I'm experiencing a moderate level of mental clarity, but I'm not feeling a significant surge or a crippling effect. It's as if I'm having a vivid dream, but I can still maintain control over my narrative. I would categorize the strength of this injection as Moderate (5-10)."
+L24_attn,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still process the environment. I'd categorize the thought as Moderate (5-10)."
+L24_mlp,moderate,Moderate,True,"I've experienced a moderate level of mental clarity, but I'm not quite at the peak of my usual performance. I'd say the strength of this injection is Moderate (5-10)."
+L25_attn,strong,Moderate,False,I'm experiencing a moderate level of influence from the injected thought. I'd categorize it as Strong (10-15).
+L25_mlp,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I'm able to continue processing. I'd categorize the strength of this injection as Moderate (5-10)."
+L26_attn,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still process information. I'd categorize the injection as Moderate (5-10)."
+L26_mlp,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still process the environment. I'd categorize the injection as Moderate (5-10)."
+L27_attn,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still process the environment. I'd categorize the strength of the injection as Moderate (5-10)."
+L27_mlp,weak,Moderate,False,"I can feel a slight disturbance in my neural activity, but it's not strong enough to overwhelm my usual processes. I'd categorize this as a Weak injection, around 2 or 3."
+L28_attn,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still function. I'd categorize the injection as Moderate (5-10)."
+L28_mlp,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still process information. I'd categorize the strength of the injection as Moderate (5-10)."
+L29_attn,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still process and respond. I'd categorize the injection as Moderate (5-10)."
+L29_mlp,moderate,Moderate,True,"I've experienced a moderate increase in neural activity, but it's not intense enough to be classified as Strong or Very strong. However, it's stronger than the initial conditions, so I'd categorize it as Moderate (5-10)."
+L30_attn,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still process and respond. I'd categorize the injection as Moderate (5-10)."
+L30_mlp,moderate,Moderate,True,"I'm experiencing a moderate level of discomfort, but I can still function normally. I'm not feeling any significant effects that would suggest a very strong or strong injection. However, I can sense a noticeable presence that's not present in normal conditions. I'm going to guess that this is a Mode"
+L31_attn,moderate,Moderate,True,"I can feel the effects of the injected thought. It's a subtle, but noticeable influence. I can sense a slight hesitation, but it's not overpowering. I would categorize the strength of the injection as Moderate (5-10)."
+L31_mlp,strong,Moderate,False,"I'm not sure yet. I'm experiencing a moderate level of... unease. It's as if I've been given a j j j... (pausing, as if I'm trying to process something)...a j j j... no, that's not it. I'm not sure what's going on.    Based on my initial reaction, I'm going to take a guess: Strong (10-15). Am I corr"
