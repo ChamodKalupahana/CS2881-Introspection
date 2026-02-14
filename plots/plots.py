@@ -130,7 +130,7 @@ def plot_success_rates(success_rates, experiment_type, output_dir):
     plt.title(title, fontsize=14)
     plt.legend(fontsize=9, loc='best', ncol=2)
     plt.grid(True, alpha=0.3)
-    plt.ylim(0, 0.8)
+    # plt.ylim(0, 0.8)
     plt.tight_layout()
     
     # Save figure

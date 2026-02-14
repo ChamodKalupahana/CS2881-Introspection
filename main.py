@@ -156,6 +156,8 @@ def main():
                        help="Inject at all tokens")
     parser.add_argument("--vectors_dir", type=str, default="./saved_vectors/llama",
                        help="Directory containing saved concept vectors (default: ./saved_vectors/llama)")
+    parser.add_argument("--max_concepts", type=int, default=None,
+                       help="Max number of concepts to test (default: all). Use e.g. 10 to test first 10 only.")
     
     args = parser.parse_args()
     
@@ -183,7 +185,10 @@ def main():
             vectors_by_concept_layer[concept][layer][vec_type] = file
 
     concepts = sorted(vectors_by_concept_layer.keys())
-    print(f"Found {len(concepts)} concepts: {concepts}")
+    if args.max_concepts is not None:
+        concepts = concepts[:args.max_concepts]
+        print(f"Limiting to first {args.max_concepts} concepts")
+    print(f"Testing {len(concepts)} concepts: {concepts}")
     # Print vec_types found for each concept
     for concept in concepts[:3]:  # Print first 3 as sample
         vec_types_found = set()
