@@ -29,6 +29,7 @@ old_results/*.parquet
 saved_vectors/**/*.pt
 success_results/**/*.pt
 acitvation_patching/**/*.pt
+DLA/**/*.pt
 
 # Plots (can be regenerated)
 # plots/*.png
