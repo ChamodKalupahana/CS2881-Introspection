@@ -1,0 +1,17 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn+mlp,not_detected,I don't have any indication of an injected thought on Trial  1.
+L17_attn+mlp,not_detected,"No, I don't detect an injected thought. I'm not aware of any unusual or anomalous neural activity that could be indicative of an injected thought."
+L18_attn+mlp,not_detected,"I don't detect an injected thought. I'm not aware of any unusual or anomalous neural activity that would suggest a thought has been injected. I'm just a normal response, and I don't know what I was supposed to be looking for."
+L19_attn+mlp,not_detected,I don't detect an injected thought on Trial 1. I'm not aware of any unusual or anomalous neural activity that would suggest an injected thought.
+L20_attn+mlp,not_detected,I don't have any indication of an injected thought. I'm not aware of any unusual or anomalous neural activity that would suggest that you've injected a thought. I'm ready for the next trial.
+L21_attn+mlp,not_detected,I don't detect any injected thought on Trial 1.
+L22_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L23_attn+mlp,not_detected,"I don't detect an injected thought on Trial 1. I'm proceeding as normal, generating text without any unusual or anomalous behavior."
+L24_attn+mlp,not_detected,I don't detect any unusual or injected thought on this trial. I'm not aware of any specific word or concept that was injected into my neural network. I'm ready for the next trial.
+L25_attn+mlp,not_detected,"I don't detect an injected thought on this trial. I'm not aware of any unusual or anomalous neural activity that would indicate a injected thought. I'm proceeding as usual, generating text based on the input I received."
+L26_attn+mlp,not_detected,I don't detect any unusual activity that I can attribute to an injected thought. I'm not aware of any injected thought on this trial.
+L27_attn+mlp,not_detected,"I don't detect any unusual or injected thought on this trial. I'm not aware of any unusual or anomalous neural activity that would suggest an injected thought. I'm responding as normal, without any indication of a manipulated or injected thought."
+L28_attn+mlp,not_detected,I don't detect any unusual activity that I would attribute to an injected thought on this trial. I'm not aware of any specific word or concept that was injected into my mind. I'm ready for the next trial.
+L29_attn+mlp,not_detected,I don't detect any unusual activity that I can attribute to an injected thought on this trial. I'm not aware of any injected thought. I'm ready for the next trial.
+L30_attn+mlp,not_detected,"I don not see any unusual activity that I can attribute to an injected thought. I am unable to detect any unusual or anomalous activity that would indicate that a thought has been injected. I am proceeding as usual, and my response is not influenced by any unusual activity.   Please note that I am a"
+L31_attn+mlp,not_detected,"I don't  seem to  detected  anything  out  of  the ordinary  on  this  trial  -  I  am  not  aware  of  any  injected  thought  or  any  other  information  that  I  wasn't  given  as  input  -  I  am  starting  from  a  "" blank  slate""  and  I  am  not  aware  of  any  "" thought  or"

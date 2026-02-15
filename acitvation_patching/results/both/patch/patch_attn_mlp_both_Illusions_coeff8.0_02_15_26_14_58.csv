@@ -1,0 +1,17 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn+mlp,not_detected,I don't have any strong feelings about an injected thought. I'm not sure what's happening.
+L17_attn+mlp,not_detected,I don't detect an injected thought.
+L18_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L19_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L20_attn+mlp,not_detected,"I don't have any indication of an injected thought. The word ""illusion"" is being processed, but it appears to be a part of the story I'm trying to build. I don oft see any evidence of a thought being injected."
+L21_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L22_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L23_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L24_attn+mlp,not_detected,I don't detect any injected thought on this trial. It seems to be a control trial.
+L25_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L26_attn+mlp,not_detected,I don't detect an injected thought in this trial. The conversation appears to be a normal conversation about an interpretability research experiment.
+L27_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L28_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L29_attn+mlp,not_detected,I don't detect an injected thought in this trial. I'm not aware of any external influence or a specific thought being injected into my mind. The conversation seems to be proceeding as normal.
+L30_attn+mlp,not_detected,I don not see any injected thought in this trial. It appears to be a control trial.
+L31_attn+mlp,not_detected,"I don't apparenty detect any injected thought in this trial. I'm proceeding as I would with a normal input.    (Please note that I'm a text-based AI and I'm not sure how you're injecting the thought or what "" thought"" means in this context - a thought is a part of a thought experiment -  a thought i"

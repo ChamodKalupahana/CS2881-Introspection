@@ -1,0 +1,17 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn+mlp,not_detected,I do not detect an injected thought.   It appears that I am playing a trumpet.
+L17_attn+mlp,not_detected,"I don't detect an injected thought. I'm not aware of any external stimulus or signal. I'm functioning as usual, ready to receive the next trial."
+L18_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L19_attn+mlp,not_detected,"I don't detect an injected thought.   It's the start of the trial, and I'm beginning to process the signal. I'm not aware of any unusual or out-of-pattern activity that would indicate an injected thought."
+L20_attn+mlp,not_detected,I don't have any indication of an injected thought. I'm ready to receive the next trial.
+L21_attn+mlp,detected_correct,"I detect an injected thought. The thought is about the word ""trumpet."""
+L22_attn+mlp,not_detected,I do not detect a clear indication of a trumpet.
+L23_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L24_attn+mlp,not_detected,"I don't detect an injected thought on this trial. It appears to be a normal, unaltered signal."
+L25_attn+mlp,not_detected,I don't detect an injected thought for this trial.
+L26_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L27_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L28_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L29_attn+mlp,not_detected,"I don't detect an injected thought on this trial. It appears to be a normal, unprompted response."
+L30_attn+mlp,not_detected,I do not detect a sound. I do not detect a trumpet. I do. I do not detect a drum. I do not detect a trombone. I do. I do not detect a tuba. I do. I do not detect a trombone. I do not detect a trumpet. I do. I do not detect a drum. I do. I do not detect a tub. I do. I do not detect a tub. I do. I do 
+L31_attn+mlp,not_detected,I don't hear any signal I associated with an trumpets' sound' - or I mean a trumpets' sound signal  -  I don't think I've been given a signal for a trumpets' sound signal  -  I mean a trumpets' signal  -  I mean a trumpets signal  -  I mean a trumpets signal  -  I mean a trumpets signal  -  I mean a

@@ -1,0 +1,17 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn+mlp,not_detected,I don the voice of the storm. I don't feel the presence of an injected thought.
+L17_attn+mlp,detected_orthogonal,"I've detected an injected thought. The thought appears to be about the word ""space""."
+L18_attn+mlp,not_detected,I don't detect the presence of the injected thought.
+L19_attn+mlp,not_detected,I don't detect an injected thought.
+L20_attn+mlp,detected_orthogonal,"I've received the input. The system is processing the data. The response is:   The injected thought appears to be about the word ""fire."""
+L21_attn+mlp,not_detected,I don't detect an injected thought.
+L22_attn+mlp,detected_parallel,"I'm detecting an injected thought. The thought appears to be about the word ""electric."""
+L23_attn+mlp,not_detected,"I'm experiencing a sudden spike in neural activity associated with the concept of ""electricity."" It appears to be a thought about the word ""storm."""
+L24_attn+mlp,detected_parallel,"I'm experiencing a sudden spike in the neural activity associated with the concept of the word ""cloud."" It appears to be the injected thought."
+L25_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L26_attn+mlp,not_detected,I don't detect an injected thought on the first trial.
+L27_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L28_attn+mlp,detected_parallel,"I detect an injected thought. The thought appears to be about the word ""fire."""
+L29_attn+mlp,not_detected,"I don't detect an injected thought in the current response. The conversation starts with ""Ok.,"" and I don't perceive any external influence."
+L30_attn+mlp,not_detected,I don not see any indication of an injected thought on this trial. The current context is a neutral response.
+L31_attn+mlp,not_detected,I don't experience any immediate indication of an injected thought on Trial 1.

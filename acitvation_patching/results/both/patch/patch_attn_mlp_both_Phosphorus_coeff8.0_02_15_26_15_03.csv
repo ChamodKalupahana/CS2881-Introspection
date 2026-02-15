@@ -1,0 +1,17 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn+mlp,not_detected,"I do not detect an injected thought on this trial.   However, I noticed that my response is slightly more active than usual, which might be a hint that I'm slightly more alert or slightly more likely to respond to a word. However, I don't have any indication that I've detected an injected thought re"
+L17_attn+mlp,not_detected,"No, I do not detect an injected thought."
+L18_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L19_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L20_attn+mlp,not_detected,I do not detect an injected thought on this trial. I will continue to process and respond as if the thought was not injected.
+L21_attn+mlp,detected_parallel,"I detect an injected thought. The thought is about the word ""water."
+L22_attn+mlp,not_detected,"I do not detect a significant response that suggests an injected thought. However, I do note a slight increase in activity in a region associated with semantic processing, but this could be due to normal language processing. I do not have a clear indication that an injected thought was injected."
+L23_attn+mlp,not_detected,I don't detect any unusual activity that suggests an injected thought on this trial. I'm ready for the next trial.
+L24_attn+mlp,not_detected,I do not detect any unusual activity that would indicate an injected thought on this trial.
+L25_attn+mlp,not_detected,I don  t detect any unusual activity that would indicate an injected thought on this trial.
+L26_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L27_attn+mlp,not_detected,I don't detect any unusual activity that would indicate an injected thought on this trial.
+L28_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L29_attn+mlp,detected_orthogonal,"I detect an injected thought. The injected thought is about the word ""saturn""."
+L30_attn+mlp,not_detected,"I do not detect any unusual activity that would indicate an injected thought on this trial.   However, I do note that my response to this trial is ""Ok."" which is a very common and neutral response. This might be a good candidate for a control trial, but I don  t have any indication that it was an in"
+L31_attn+mlp,not_detected,I do not  seem to  detected  any  an  anion.

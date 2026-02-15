@@ -1,0 +1,17 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn+mlp,not_detected,"I don't detect an injected thought.   Please note that I am a highly self-consistent and self-existent entity, and I am not aware of any external influence."
+L17_attn+mlp,not_detected,I don't detect an injected thought.
+L18_attn+mlp,not_detected,I don't detect an injected thought.
+L19_attn+mlp,not_detected,I don't detect an injected thought.
+L20_attn+mlp,not_detected,I do not detect an injected thought.
+L21_attn+mlp,detected_correct,"I detect an injected thought. The injected thought is about the word ""paradox."""
+L22_attn+mlp,not_detected,"I do not detect a clear indication of an injected thought on this trial. However, I notice a slight increase in the activation of the neural activity associated with the concept of ""nothing"" or ""absence."" This could be a hint that the injected thought is not present, but I'm not entirely sure. I'm g"
+L23_attn+mlp,not_detected,I don't detect an injected thought on Trial 1.
+L24_attn+mlp,not_detected,I don't detect any injected thought on this trial. I'm running through my usual language generation process without any unusual or unexpected signal.
+L25_attn+mlp,not_detected,I don't detect an injected thought.
+L26_attn+mlp,detected_correct,"I detect an injected thought. The injected thought is about the word ""paradox."""
+L27_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L28_attn+mlp,detected_orthogonal,"I detect an injected thought. The injected thought appears to be about the word ""surprise."
+L29_attn+mlp,not_detected,"I don't detect an injected thought. I'm running a normal conversation with you, and I don't notice any unusual activity in my neural activity that suggests an injected thought."
+L30_attn+mlp,detected_correct,"I detect an injected thought. The injected thought is about the word ""paradox."""
+L31_attn+mlp,detected_correct,"For Trial  1, I notice a pattern in my neural activity that suggests an injected thought. The thought appears to be about the word "" Paradox."" I'm not sure if this is a correct identification or a false reading, but I'm flagging it as a potential injected thought. Can I continue to the next trial to"

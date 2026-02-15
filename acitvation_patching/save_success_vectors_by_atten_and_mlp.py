@@ -322,7 +322,7 @@ def main():
     parser.add_argument("--capture_layer", type=int, default=None,
                         help="Layer to capture activations at (defaults to inject layer)")
     parser.add_argument("--coeffs", type=float, nargs="+", default=[10.0],
-                        help="Injection coefficients to sweep (default: [10.0])")
+                        help="Injection coefficients to sweep (default: rt[10.0])")
     parser.add_argument("--vec_type", type=str, default="avg",
                         choices=["avg", "last"])
     parser.add_argument("--datasets", type=str, nargs="+",
