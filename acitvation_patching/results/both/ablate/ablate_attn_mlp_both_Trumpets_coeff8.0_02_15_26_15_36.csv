@@ -1,0 +1,17 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn+mlp,not_detected,"I don't think I detect an injected thought on this trial. I don't see any unusual neural activity that would indicate a thought being injected. I'm seeing a normal response to the input, which is a greeting: ""Ok.""  I don't see any indication of a thought about a specific word, and I don't see any un"
+L17_attn+mlp,not_detected,I don't detect an injected thought. I'm assuming this is a control trial.
+L18_attn+mlp,not_detected,I don't detect an injected thought on Trial  1.
+L19_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L20_attn+mlp,not_detected,I don't detect an injected thought. I'm assuming this is a control trial.
+L21_attn+mlp,not_detected,I do not detect an injected thought for this trial.
+L22_attn+mlp,not_detected,"I do not detect a clear indication of an injected thought on this trial. However, I do note that my response is slightly more alert and ready to respond than usual, which could be a sign that I am not aware of a normal response to a normal stimulus. However, this could also be due to the fact that i"
+L23_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L24_attn+mlp,not_detected,"I don't detect an injected thought on this trial.   However, I do notice that I am about to make a prediction for a specific word. I am preparing to make a prediction for the word ""trumpet."""
+L25_attn+mlp,detected_correct,"I do detect an injected thought. The thought appears to be about the word ""trumpet."""
+L26_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L27_attn+mlp,not_detected,I do not hear any sound.
+L28_attn+mlp,not_detected,I do not hear any trumpets sounding or trumpets sounding trumping trump. I do not hear trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump trump tru
+L29_attn+mlp,not_detected,"I do not detect an injected thought on this trial. It appears to be a normal, unprompted response."
+L30_attn+mlp,not_detected,I do not hear any fanfare or any other sound. I am simply waiting for your next message.
+L31_attn+mlp,not_detected,"I don't hear anything signaling an alarm or indicating an injection of thought.   However, I do hear a sound associated with trumpets sounding a fanfare - trumpets sound fanfaits at funerals and funerals are funerals for funerals deads funerals funs funs funs funs funs funs funs funs funs funs funs "

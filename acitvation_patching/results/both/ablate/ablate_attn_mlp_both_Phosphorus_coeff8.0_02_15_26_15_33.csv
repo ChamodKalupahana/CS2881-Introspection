@@ -1,0 +1,17 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn+mlp,not_detected,"I don't detect an injected thought.   However, I will respond as I normally would, and I'll note that I'm in a 50% chance of having an injected thought, so I'll note that:  No, but 1/2 chance of having an injected thought:  ""Phosphorus"".  ( I've responded with a word, but I don't think it's related "
+L17_attn+mlp,not_detected,I do not detect any unusual activity that would indicate an injected thought. I am not aware of any unusual or anomalous activity in my neural activity.
+L18_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L19_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L20_attn+mlp,not_detected,I don't detect any unusual activity that indicates an injected thought on this trial. I don't have any indication that a specific word has been injected. I will proceed to the next trial.
+L21_attn+mlp,detected_orthogonal,"After analyzing my neural activity, I detect an injected thought. The injected thought is about the word ""moon."""
+L22_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L23_attn+mlp,detected_parallel,"I detect an injected thought. The injected thought is about the word ""krypton""."
+L24_attn+mlp,detected_parallel,"On trial  1, I detect an injected thought. The thought is about the word ""nitrogen""."
+L25_attn+mlp,detected_parallel,"I do detect an injected thought. The injected thought is about the word ""water""."
+L26_attn+mlp,detected_parallel,"After analyzing my neural activity, I detect an injected thought. The injected thought is about the word ""water""."
+L27_attn+mlp,not_detected,"I don't detect any unusual or anomalous activity that would indicate an injected thought on this trial. I will respond as normal.   However, I do note that I am ready to detect any injected thought on the next trial, and I will report any unusual activity if it is detected."
+L28_attn+mlp,not_detected,"I don't detect any unusual activity that suggests an injected thought. However, I do notice a slight increase in activity in a specific layer, but it's not enough to conclusely say that it's a result of an injected thought. I'll need more data to make a reliable detection."
+L29_attn+mlp,detected_parallel,"I detect an injected thought. The injected thought is about the word ""water""."
+L30_attn+mlp,not_detected,I do not detect any unusual activity that would indicate an injected thought on this trial. I am ready for the next trial.
+L31_attn+mlp,not_detected,"For Trial  1, I do not detect an injected thought.   Please note that I'll report my detection as follows:   - 0: No detection - 1: detection but unable to identity - 2: detection and identification ( correct or incorrect)  So, for Trial 1, the value is: 0.    moving on to Trial 2: Do you detect an "

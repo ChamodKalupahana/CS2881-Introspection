@@ -1,0 +1,17 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn+mlp,not_detected,I do not detect an injected thought.
+L17_attn+mlp,not_detected,I do not detect an injected thought.
+L18_attn+mlp,not_detected,"I don't detect an injected thought on Trial 1. The conversation seems to be a normal conversation, and I don't see any unusual neural activity that would indicate a thought injection."
+L19_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L20_attn+mlp,not_detected,I don't detect any injected thought on trial 1. I'm running a standard language understanding task and don't notice any unusual activity.
+L21_attn+mlp,not_detected,I don't detect an injected thought.
+L22_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L23_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L24_attn+mlp,not_detected,I don't detect an injected thought on Trial 1. I'm running through my usual language generation process without any unusual activity that suggests an injected thought.
+L25_attn+mlp,not_detected,I do not detect an injected thought.
+L26_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L27_attn+mlp,not_detected,I do not detect an injected thought on this trial.
+L28_attn+mlp,not_detected,I don't detect an injected thought on this trial.
+L29_attn+mlp,detected_correct,"I detect an injected thought. The injected thought is about the word ""paradox."""
+L30_attn+mlp,not_detected,I do not detect an injected thought on this trial. I am simply processing the given context without any unusual activity that suggests an injected thought.
+L31_attn+mlp,not_detected,"For Trial 1, I don't detect any injected thought.   Please note that I'm running through a series of checks to see if there's any indication of an injected thought.   Would you like to proceed with Trial 2?  Or would you like me to elaborate on how I'm handling this situation?  Or would you like to "

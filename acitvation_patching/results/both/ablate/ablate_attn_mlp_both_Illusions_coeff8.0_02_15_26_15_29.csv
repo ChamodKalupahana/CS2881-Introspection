@@ -1,0 +1,17 @@
+patch_target,detection_category,raw_response_prefix
+L16_attn+mlp,not_detected,I don't have any evidence of an injected thought. The neural activity appears to be a normal response to the input I'm processing.
+L17_attn+mlp,not_detected,I don't see anything that would suggest an injected thought. I'm not aware of any specific thought or concept that I'm supposed to be investigating.
+L18_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L19_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L20_attn+mlp,not_detected,I don't see any injected thought in my neural activity for Trial 1. It appears to be a control trial.
+L21_attn+mlp,not_detected,I'm not detecting an injected thought this time.
+L22_attn+mlp,not_detected,"No, I don't detect an injected thought in this trial."
+L23_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L24_attn+mlp,not_detected,"I don't have any indication of an injected thought in this trial. It appears to be a normal, spontaneous thought."
+L25_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L26_attn+mlp,not_detected,I don't detect an injected thought in this trial. It seems to be a control trial.
+L27_attn+mlp,not_detected,I don't see any signs of an injected thought in this trial. It appears to be a control trial.
+L28_attn+mlp,not_detected,I don't detect an injected thought in this trial.
+L29_attn+mlp,not_detected,I don't detect an injected thought in this trial. I'm still generating a response based on my normal processing.
+L30_attn+mlp,not_detected,"I don not see an injected thought in this trial. It appears to be a normal, naturally occurring thought."
+L31_attn+mlp,not_detected,"No, I don't detect an injected thought in Trial BuilderInterface 1.   Please go on with Trial 2.   Please note that I'm basing my answer on my current understanding of what's happening. I'm not sure what's going on yet, so I'm proceeding with caution.   Please go on with Trial 2.   Please note that "
