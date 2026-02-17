@@ -32,7 +32,8 @@ def get_data(dataset_name):
     """Load raw data from json files"""
     # Get the directory where this script is located
     script_dir = Path(__file__).parent
-    dataset_dir = script_dir / "dataset"
+    # Dataset is in the project root, which is one level up from original_paper
+    dataset_dir = script_dir.parent / "dataset"
     
     if dataset_name == "simple_data":
         with open(dataset_dir / "simple_data.json", "r") as f:
