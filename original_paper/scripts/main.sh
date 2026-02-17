@@ -67,7 +67,7 @@ mkdir -p /tmp/ehahami/cache
 
 which python
 
-cd /n/home10/ehahami/work/nov26_experiments
+# cd /n/home10/ehahami/work/nov26_experiments
 
 # Default parameters (can be overridden by command line)
 LAYERS="9 12 15 18"
@@ -75,7 +75,8 @@ COEFFS="4 9 16"
 
 # Use full path to Python in mamba environment
 # Run with the selected experiment type
-/n/holylabs/LABS/sompolinsky_lab/Everyone/xupan/envs/gpt/bin/python main.py \
+# /n/holylabs/LABS/sompolinsky_lab/Everyone/xupan/envs/gpt/bin/python main.py \\
+python original_paper/main.py \\
     --type "$EXPERIMENT_TYPE" \
     --layers $LAYERS \
     --coeffs $COEFFS \

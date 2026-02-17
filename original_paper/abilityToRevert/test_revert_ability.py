@@ -3,10 +3,11 @@ import os
 from pathlib import Path
 
 # Add parent directory to path to import from nov26_experiments
-sys.path.insert(0, str(Path(__file__).parent.parent / "nov26_experiments"))
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from compute_concept_vector_utils import compute_concept_vector
-from inject_concept_vector import get_model_type, format_inference_prompt
+from original_paper.compute_concept_vector_utils import compute_concept_vector
+from original_paper.inject_concept_vector import get_model_type, format_inference_prompt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import json

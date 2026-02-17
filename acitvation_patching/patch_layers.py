@@ -26,9 +26,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(PROJECT_ROOT))
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from compute_concept_vector_utils import compute_concept_vector
-from all_prompts import get_anthropic_reproduce_messages
-from api_utils import query_llm_judge, client
+from original_paper.compute_concept_vector_utils import compute_concept_vector
+from original_paper.all_prompts import get_anthropic_reproduce_messages
+from original_paper.api_utils import query_llm_judge, client
 
 
 # ── Classification ───────────────────────────────────────────────────────────

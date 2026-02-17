@@ -9,8 +9,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from compute_concept_vector_utils import compute_concept_vector
-from all_prompts import get_anthropic_reproduce_messages
+from original_paper.compute_concept_vector_utils import compute_concept_vector
+from original_paper.all_prompts import get_anthropic_reproduce_messages
 
 def inject_and_capture_head_contributions(
     model, tokenizer, steering_vector, layer_to_inject, target_layers, success_vectors,

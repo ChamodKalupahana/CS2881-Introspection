@@ -1,5 +1,10 @@
-from compute_concept_vector_utils import compute_concept_vector
-from inject_concept_vector import inject_concept_vector
+import sys
+from pathlib import Path
+# Add project root to sys.path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from original_paper.compute_concept_vector_utils import compute_concept_vector
+from original_paper.inject_concept_vector import inject_concept_vector
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import argparse

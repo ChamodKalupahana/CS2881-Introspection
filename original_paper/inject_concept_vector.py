@@ -1,7 +1,7 @@
 import torch
 import transformers 
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from compute_concept_vector_utils import get_model_type
+from original_paper.compute_concept_vector_utils import get_model_type
 
 
 def format_inference_prompt(model_type, user_message):

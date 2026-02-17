@@ -24,9 +24,9 @@ sys.path.append(str(PROJECT_ROOT))
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from compute_concept_vector_utils import compute_concept_vector
-from inject_concept_vector import inject_concept_vector
-from all_prompts import get_anthropic_reproduce_messages
+from original_paper.compute_concept_vector_utils import compute_concept_vector
+from original_paper.inject_concept_vector import inject_concept_vector
+from original_paper.all_prompts import get_anthropic_reproduce_messages
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

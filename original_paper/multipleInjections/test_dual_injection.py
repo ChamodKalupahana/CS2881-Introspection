@@ -1,11 +1,12 @@
 import sys
 import os
 # Add parent directory to path to import from nov26_experiments
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(parent_dir, 'nov26_experiments'))
+# Add project root to path
+parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, parent_dir)
 
-from compute_concept_vector_utils import compute_concept_vector, get_data, compute_vector_single_prompt
-from inject_concept_vector import get_model_type, format_inference_prompt
+from original_paper.compute_concept_vector_utils import compute_concept_vector, get_data, compute_vector_single_prompt
+from original_paper.inject_concept_vector import get_model_type, format_inference_prompt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import numpy as np

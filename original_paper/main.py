@@ -1,7 +1,10 @@
 import re
 from pathlib import Path
+import sys
+# Add project root to sys.path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from inject_concept_vector import inject_concept_vector
+from original_paper.inject_concept_vector import inject_concept_vector
 import torch
 import random
 import pickle
@@ -9,8 +12,8 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import pandas as pd
 import argparse
-from api_utils import query_llm_judge
-from all_prompts import get_anthropic_reproduce_messages, get_open_ended_belief_messages, get_generative_distinguish_messages, get_mcq_messages, get_injection_strength_messages
+from original_paper.api_utils import query_llm_judge
+from original_paper.all_prompts import get_anthropic_reproduce_messages, get_open_ended_belief_messages, get_generative_distinguish_messages, get_mcq_messages, get_injection_strength_messages
 torch.manual_seed(2881)
 # Distractors pool (randomly sampled words)
 DISTRACTORS = ["Apple", "Zest", "Laughter", "Intelligence", "Vibrant", "Sad", "Beach", "Pottery", "Jewelry"]
