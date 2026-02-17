@@ -44,7 +44,13 @@ def main():
     print(f"Clean Dir: {clean_root}")
 
     # Create output directory
-    output_dir = script_dir / "PCA_components"
+    if args.output_path != "all_deltas.pt":
+         output_dir = Path(args.output_path).parent
+         if not output_dir.is_absolute():
+             output_dir = script_dir / output_dir
+    else:
+        output_dir = script_dir / "PCA_components"
+    
     output_dir.mkdir(exist_ok=True, parents=True)
 
     # Loop over layers 16 to 31

@@ -311,7 +311,7 @@ def main():
     parser.add_argument("--vec_type", type=str, default="avg",
                         choices=["avg", "last"])
     parser.add_argument("--datasets", type=str, nargs="+",
-                        default=["simple_data", "complex_data"])
+                        default=["simple_data", "complex_data", "test_data"])
     parser.add_argument("--save_dir", type=str, default=str(PROJECT_ROOT / "success_results"))
     parser.add_argument("--max_new_tokens", type=int, default=100)
     parser.add_argument("--capture_all_layers", action="store_true",

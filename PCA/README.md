@@ -16,3 +16,17 @@ then you can run: `python compute_delta_per_layer.py --coeff 8.0 --injected_dir 
 once you've done that, you can plot PCA using:
 `python compute_PCA.py` - for number of components to explain 80% of variance 
 `python compute_PCA.py --plot_pc1` - explained variance ratio of the first principal component
+
+to validate results, want to do the same for the test dataset:
+1. find a correct vs no_inject example
+`python save_vectors_by_layer.py --layers 16 --coeffs 8.0 --capture_all_layers --datasets test_data`
+
+2. find delta by layer
+```
+python compute_delta_per_layer.py --coeff 8.0 \
+  --injected_dir validation/injected_correct \
+  --clean_dir validation/no_inject \
+  --output_path validation/components/val_deltas.pt
+```
+- project this new example to all_deltas by layer
+- should expect lower at semantic layers (16 - > 20) and then higher for > 20
