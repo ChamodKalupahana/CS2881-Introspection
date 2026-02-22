@@ -31,6 +31,7 @@ success_results/**/*.pt
 acitvation_patching/**/*.pt
 DLA/**/*.pt
 PCA/**/*.pt
+linear_probe/**/*.pt
 
 # Plots (can be regenerated)
 # plots/*.png

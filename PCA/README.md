@@ -32,3 +32,5 @@ python compute_delta_per_layer.py --coeff 8.0 \
 ```
 - project this new example to all_deltas by layer
 - should expect lower at semantic layers (16 - > 20) and then higher for > 20
+
+can run this with: `python validate_PCA.py`

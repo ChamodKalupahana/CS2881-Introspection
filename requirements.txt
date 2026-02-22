@@ -10,3 +10,4 @@ tqdm
 openai
 python-dotenv
 pyarrow
+scikit-learn
