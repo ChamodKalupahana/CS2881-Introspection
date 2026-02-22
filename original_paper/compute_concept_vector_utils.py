@@ -47,6 +47,10 @@ def get_data(dataset_name):
         with open(dataset_dir / "test_data.json", "r") as f:
             data = json.load(f)
         return data
+    elif dataset_name == "simple_data_expanded":
+        with open(dataset_dir / "simple_data_expanded.json", "r") as f:
+            data = json.load(f)
+        return data
 
 
 def compute_vector_single_prompt(model, tokenizer, dataset_name, steering_prompt, layer_idx):
@@ -96,7 +100,7 @@ def compute_concept_vector(model, tokenizer, dataset_name, layer_idx):
     data = get_data(dataset_name)
     steering_vectors = {}
     
-    if dataset_name == "simple_data":
+    if dataset_name in ("simple_data", "simple_data_expanded"):
         concept_words = data["concept_vector_words"]
         baseline_words = data["baseline_words"][:50]
         

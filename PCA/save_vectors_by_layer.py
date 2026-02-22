@@ -311,7 +311,7 @@ def main():
     parser.add_argument("--vec_type", type=str, default="avg",
                         choices=["avg", "last"])
     parser.add_argument("--datasets", type=str, nargs="+",
-                        default=["simple_data", "complex_data", "test_data"])
+                        default=["simple_data", "complex_data", "test_data", "simple_data_expanded"])
     parser.add_argument("--save_dir", type=str, default=str(PROJECT_ROOT / "success_results"))
     parser.add_argument("--max_new_tokens", type=int, default=100)
     parser.add_argument("--capture_all_layers", action="store_true",
@@ -368,6 +368,9 @@ def main():
 
             for concept, (vec_last, vec_avg) in vectors.items():
                 steering_vector = vec_avg if args.vec_type == "avg" else vec_last
+
+                # Cache for no-inject baseline (saved to PCA/no_inject later if injected run succeeds)
+                cached_noinject = None
 
                 # Prepare list of tasks: (coeff, skip_inject)
                 # 1. Baseline (skip_inject=True, coeff=0.0 is dummy)
@@ -474,6 +477,88 @@ def main():
                         "last_prompt_logits": last_prompt_logits,
                     }, concept_dir / logits_filename)
                     print(f"  💾  Saved last_prompt_logits → {concept_dir / logits_filename}")
+
+                    # ── Cache no-inject baseline for later PCA save ──
+                    if skip_inject:
+                        cached_noinject = {
+                            "activations": activations,
+                            "layers_to_save": layers_to_save,
+                            "last_prompt_logits": last_prompt_logits,
+                            "response": response,
+                            "category": category,
+                        }
+
+                    # ── Additionally save to PCA dirs for successful detections ──
+                    if not skip_inject and category in ("detected_parallel", "detected_correct"):
+                        pca_root = PROJECT_ROOT / "PCA"
+
+                        # Save injected activation to PCA/injected_correct
+                        pca_inject_dir = pca_root / "injected_correct"
+                        for save_layer in layers_to_save:
+                            layer_acts = activations[save_layer]
+                            pca_concept_dir = pca_inject_dir / concept
+                            pca_concept_dir.mkdir(parents=True, exist_ok=True)
+                            filename = f"{concept}_layer{save_layer}_{coeff_label}_{args.vec_type}.pt"
+                            torch.save({
+                                "concept": concept,
+                                "dataset": dataset_name,
+                                "category": category,
+                                "inject_layer": layer,
+                                "capture_layer": save_layer,
+                                "coeff": coeff,
+                                "vec_type": args.vec_type,
+                                "model_name": args.model,
+                                "response": response,
+                                "activations": layer_acts,
+                            }, pca_concept_dir / filename)
+                        # Logits
+                        pca_concept_dir = pca_inject_dir / concept
+                        pca_concept_dir.mkdir(parents=True, exist_ok=True)
+                        torch.save({
+                            "concept": concept, "dataset": dataset_name,
+                            "category": category, "inject_layer": layer,
+                            "coeff": coeff, "vec_type": args.vec_type,
+                            "model_name": args.model, "response": response,
+                            "last_prompt_logits": last_prompt_logits,
+                        }, pca_concept_dir / logits_filename)
+                        print(f"  💾  [PCA] Saved injected → {pca_inject_dir / concept}/")
+
+                        # Save cached no-inject baseline to PCA/no_inject
+                        if cached_noinject is not None:
+                            pca_noinject_dir = pca_root / "no_inject"
+                            ni = cached_noinject
+                            ni_coeff_label = "noinject"
+                            for save_layer in ni["layers_to_save"]:
+                                layer_acts = ni["activations"][save_layer]
+                                pca_concept_dir = pca_noinject_dir / concept
+                                pca_concept_dir.mkdir(parents=True, exist_ok=True)
+                                filename = f"{concept}_layer{save_layer}_{ni_coeff_label}_{args.vec_type}.pt"
+                                torch.save({
+                                    "concept": concept,
+                                    "dataset": dataset_name,
+                                    "category": ni["category"],
+                                    "inject_layer": layer,
+                                    "capture_layer": save_layer,
+                                    "coeff": 0.0,
+                                    "vec_type": args.vec_type,
+                                    "model_name": args.model,
+                                    "response": ni["response"],
+                                    "activations": layer_acts,
+                                }, pca_concept_dir / filename)
+                            # Logits
+                            pca_concept_dir = pca_noinject_dir / concept
+                            pca_concept_dir.mkdir(parents=True, exist_ok=True)
+                            ni_logits_filename = f"last_prompt_logits_{ni_coeff_label}_{args.vec_type}.pt"
+                            torch.save({
+                                "concept": concept, "dataset": dataset_name,
+                                "category": ni["category"], "inject_layer": layer,
+                                "coeff": 0.0, "vec_type": args.vec_type,
+                                "model_name": args.model, "response": ni["response"],
+                                "last_prompt_logits": ni["last_prompt_logits"],
+                            }, pca_concept_dir / ni_logits_filename)
+                            print(f"  💾  [PCA] Saved no_inject → {pca_noinject_dir / concept}/")
+                        else:
+                            print(f"  ⚠  [PCA] No cached no-inject baseline available for {concept}")
 
 
     # Summary
