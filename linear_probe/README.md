@@ -30,3 +30,8 @@ python test_probe_dir_casual.py --layers 16 --coeffs 8.0 --datasets test_data --
 python compute_delta_per_layer_not_detected.py \
   --detected_dir injected_correct_expanded \
   --not_detected_dir not_detected
+
+### mean mass vector  
+python compute_mass_mean_vector.py --layer 19
+
+python test_probe_dir_casual.py --layers 16 --coeffs 8.0 --datasets test_data --alphas -8 -5 -2 0 2 5 8 16 24 --probe_layer 24 --clean_once --probe_path probe_vectors/mass_mean_vector_layer24.pt

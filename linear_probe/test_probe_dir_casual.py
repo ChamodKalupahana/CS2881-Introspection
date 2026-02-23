@@ -274,6 +274,8 @@ def main():
     parser.add_argument("--max_new_tokens", type=int, default=100)
     parser.add_argument("--skip_clean", action="store_true",
                         help="Skip the clean (no-injection) runs")
+    parser.add_argument("--clean_once", action="store_true",
+                        help="Only run clean (no-injection) for the first concept")
     args = parser.parse_args()
 
     # ── Create timestamped run directory & tee logging ────────────────────
@@ -324,6 +326,7 @@ def main():
     }
 
     # ── Sweep ────────────────────────────────────────────────────────────
+    clean_done = False
     for dataset_name in args.datasets:
         print(f"\n{'=' * 70}")
         print(f"  Dataset: {dataset_name}")
@@ -363,7 +366,7 @@ def main():
                         tag = f"alpha={alpha:>6.1f}"
                         print(f"    {tag} | {icon} {category} | {response[:380]}{'…' if len(response) > 380 else ''}")
 
-                    if not args.skip_clean:
+                    if not args.skip_clean and not (args.clean_once and clean_done):
                         print(f"\n  ▶ CLEAN responses (no concept vector):")
                         for alpha in args.alphas:
                             try:
@@ -384,6 +387,7 @@ def main():
                             icon = icons.get(category, "❓")
                             tag = f"alpha={alpha:>6.1f}"
                             print(f"    {tag} | {icon} {category} | {response[:380]}{'…' if len(response) > 380 else ''}")
+                        clean_done = True
 
     # ── Summary by alpha ─────────────────────────────────────────────────
     print(f"\n{'=' * 60}")
