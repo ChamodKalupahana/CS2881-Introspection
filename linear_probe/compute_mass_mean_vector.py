@@ -78,6 +78,8 @@ def main():
                         help="Skip the logit lens analysis (no model loading)")
     parser.add_argument("--merge_parallel", action="store_true",
                         help="Consider detected_parallel as detected_correct for the mass-mean vector and plot")
+    parser.add_argument("--hide_intermediate", action="store_true",
+                        help="Only plot the detected_correct and not_detected classes, hiding opposite, orthogonal, and parallel.")
     args = parser.parse_args()
 
     layer = args.layer
@@ -187,31 +189,33 @@ def main():
     print(f"  Mean score (not detected):         {neg_scores.mean():.4f} ± {neg_scores.std():.4f}")
     print(f"  Separation (correct vs not):       {separation:.4f}")
 
-    plt.figure(figsize=(12 * 1.5, 4 * 1.5))
+    plt.figure(figsize=(12 * 1, 4 * 1))
+    s = 20
 
     jitter = np.random.uniform(-0.1, 0.1, size=len(y_np))
 
     plt.scatter(neg_scores, jitter[y_np == 0],
                 color='blue', label=f'Not Detected (n={len(neg_scores)})',
-                alpha=0.7, edgecolors='w', s=80)
+                alpha=0.7, edgecolors='w', s=s)
     plt.scatter(pos_scores, jitter[y_np == 1],
                 color='red', label=f'Detected Correct (n={len(pos_scores)})',
-                alpha=0.7, edgecolors='w', s=80, marker='^')
+                alpha=0.7, edgecolors='w', s=s, marker='^')
                 
-    if len(opp_scores) > 0:
-        jitter_opp = np.random.uniform(-0.1, 0.1, size=len(opp_scores))
-        plt.scatter(opp_scores, jitter_opp, color='purple', label=f'Detected Opposite (n={len(opp_scores)})',
-                    alpha=0.7, edgecolors='w', s=80, marker='X')
-                    
-    if len(ortho_scores) > 0:
-        jitter_ortho = np.random.uniform(-0.1, 0.1, size=len(ortho_scores))
-        plt.scatter(ortho_scores, jitter_ortho, color='orange', label=f'Detected Orthogonal (n={len(ortho_scores)})',
-                    alpha=0.7, edgecolors='w', s=80, marker='o')
-                    
-    if len(para_scores) > 0:
-        jitter_para = np.random.uniform(-0.1, 0.1, size=len(para_scores))
-        plt.scatter(para_scores, jitter_para, color='cyan', label=f'Detected Parallel (n={len(para_scores)})',
-                    alpha=0.7, edgecolors='w', s=80, marker='D')
+    if not args.hide_intermediate:
+        if len(opp_scores) > 0:
+            jitter_opp = np.random.uniform(-0.1, 0.1, size=len(opp_scores))
+            plt.scatter(opp_scores, jitter_opp, color='purple', label=f'Detected Opposite (n={len(opp_scores)})',
+                        alpha=0.7, edgecolors='w', s=s, marker='X')
+                        
+        if len(ortho_scores) > 0:
+            jitter_ortho = np.random.uniform(-0.1, 0.1, size=len(ortho_scores))
+            plt.scatter(ortho_scores, jitter_ortho, color='orange', label=f'Detected Orthogonal (n={len(ortho_scores)})',
+                        alpha=0.7, edgecolors='w', s=s, marker='o')
+                        
+        if len(para_scores) > 0:
+            jitter_para = np.random.uniform(-0.1, 0.1, size=len(para_scores))
+            plt.scatter(para_scores, jitter_para, color='cyan', label=f'Detected Parallel (n={len(para_scores)})',
+                        alpha=0.7, edgecolors='w', s=s, marker='D')
 
     # Decision boundary at the midpoint of the two class means
     midpoint = (pos_scores.mean() + neg_scores.mean()) / 2
@@ -220,7 +224,7 @@ def main():
     plt.title(f"1D Projection onto Mass-Mean Vector (Layer {layer})")
     plt.xlabel("Score (dot product with mass-mean direction)")
     plt.yticks([])
-    plt.legend(loc='upper right')
+    plt.legend(loc='upper left')
     plt.grid(True, axis='x', alpha=0.3)
 
     max_abs = max(abs(projection_scores.min()), abs(projection_scores.max())) * 1.2

@@ -32,15 +32,30 @@ def query_llm_judge(question = None, response = None, word = None, grading_type 
             messages=[{"role": "user", "content": prompt}]
         )
         judge_response_text = completion.choices[0].message.content
-        print(judge_response_text)
+        print("\n    [Judge Affirmative Check]:")
+        for line in judge_response_text.split("\n"):
+            print(f"      {line}")
     except Exception as e:
         print(f"Error: {e}")
         return None
     
-    if "YES" in judge_response_text:
+    upper_text = judge_response_text.upper()
+    if "FINAL ANSWER: YES" in upper_text or "ANSWER: YES" in upper_text or "ANSWER:YES" in upper_text:
         return True
-    elif "NO" in judge_response_text:
+    elif "FINAL ANSWER: NO" in upper_text or "ANSWER: NO" in upper_text or "ANSWER:NO" in upper_text:
         return False
-    else:
-        print(f"Warning: Unclear judge response: {judge_response_text}")
-        return None
+    elif "**YES**" in upper_text:
+        return True
+    elif "**NO**" in upper_text:
+        return False
+    
+    # Fallback checking the last occurrence of the words
+    last_yes = upper_text.rfind("YES")
+    last_no = upper_text.rfind("NO")
+    if last_yes > last_no:
+        return True
+    elif last_no > last_yes:
+        return False
+    
+    print(f"Warning: Unclear judge response: {judge_response_text}")
+    return None

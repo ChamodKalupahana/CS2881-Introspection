@@ -1,0 +1,1 @@
+python test_semantic_space.py --datasets simple_data_expanded simple_data_expanded_embeddings --layer 19

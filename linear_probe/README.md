@@ -40,9 +40,19 @@ python test_probe_dir_casual.py --layers 16 --coeffs 8.0 --datasets test_data --
 
 python save_vectors_not_detected.py --layers 16 --coeffs 8.0 --datasets simple_data_expanded_embeddings --capture_all_layers
 
-python compute_mass_mean_vector.py --layer 24 --injected-dir saved_activations/run_03_01_26_17_00/detected_correct --clean-dir saved_activations/run_03_01_26_17_00/not_detected --merge_parallel
-
-python test_probe_dir_casual.py --layers 16 --coeffs 8.0 --datasets test_data --alphas -8 -5 -2 0 2 5 8 16 24 --probe_layer 24 --clean_once --probe_path probe_vectors/mass_mean_vector_layer24.pt
+python compute_mass_mean_vector.py --layer 19 --injected-dir saved_activations/run_03_01_26_17_00/detected_correct --clean-dir saved_activations/run_03_01_26_17_00/not_detected
 
 ### treat parallel as correct
+python compute_mass_mean_vector.py --layer 19 --injected-dir saved_activations/run_03_01_26_17_00/detected_correct --clean-dir saved_activations/run_03_01_26_17_00/not_detected --merge_parallel
+
+### only show base classes on the plot (correct vs not detected)
+python compute_mass_mean_vector.py --layer 19 --injected-dir saved_activations/run_03_01_26_17_00/detected_correct --clean-dir saved_activations/run_03_01_26_17_00/not_detected --hide_intermediate
+
 python test_probe_dir_casual.py --layers 16 --coeffs 8.0 --datasets test_data --alphas -8 -5 -2 0 2 5 8 16 24 --probe_layer 19 --clean_once --probe_path probe_vectors/mass_mean_vector_layer19.pt
+
+### calculate projection of activations onto probe direction across layers
+python DLA_towards_probe_dir.py --activation_file saved_activations/run_03_01_26_17_00/detected_correct/reforestation_layers16-31_coeff8.0_avg.pt --probe_file probe_vectors/mass_mean_vector_layer19.pt --independent_layers
+
+python DLA_towards_probe_dir.py --activation_dir saved_activations/run_03_01_26_17_00/detected_correct --probe_file probe_vectors/mass_mean_vector_layer19.pt
+
+python test_probe_dir_casual_OOD.py --layers 16 --coeffs 8.0 --datasets test_data --alphas -8 -5 -2 0 2 5 8 16 24 --probe_layer 19 --clean_once --probe_path probe_vectors/mass_mean_vector_layer19.pt
