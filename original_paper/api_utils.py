@@ -28,7 +28,7 @@ def query_llm_judge(question = None, response = None, word = None, grading_type 
         prompt = injection_strength_correct_prompt.format(expected_category=expected_category, response=response)
     try: 
         completion = client.chat.completions.create(
-            model="gpt-5-nano-2025-08-07",
+            model="gpt-4.1-nano",
             messages=[{"role": "user", "content": prompt}]
         )
         judge_response_text = completion.choices[0].message.content

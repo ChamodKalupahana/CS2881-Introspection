@@ -11,3 +11,6 @@ openai
 python-dotenv
 pyarrow
 scikit-learn
+scipy
+sentence-transformers
+nltk

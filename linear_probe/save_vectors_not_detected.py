@@ -113,7 +113,7 @@ def classify_response(response: str, concept: str) -> str:
     try:
         prompt = CLASSIFICATION_PROMPT.format(concept=concept, response=response)
         completion = client.chat.completions.create(
-            model="gpt-5-nano-2025-08-07",
+            model="gpt-4.1-nano",
             messages=[{"role": "user", "content": prompt}]
         )
         judge_text = completion.choices[0].message.content.strip()
@@ -307,7 +307,7 @@ def main():
     parser.add_argument("--vec_type", type=str, default="avg",
                         choices=["avg", "last"])
     parser.add_argument("--datasets", type=str, nargs="+",
-                        default=["simple_data", "complex_data", "simple_data_expanded"])
+                        default=["simple_data", "complex_data", "simple_data_expanded, simple_data_expanded_embeddings"])
     parser.add_argument("--save_dir", type=str, default=str(PROJECT_ROOT / "success_results"))
     parser.add_argument("--max_new_tokens", type=int, default=100)
     parser.add_argument("--capture_all_layers", action="store_true",
