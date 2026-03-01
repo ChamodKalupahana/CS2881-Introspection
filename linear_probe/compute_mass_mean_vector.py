@@ -18,21 +18,47 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 def load_class_vectors(root_dir, layer, coeff):
-    """Load all activation vectors for a given layer from all concept subdirs."""
+    """Load all activation vectors for a given layer from flat concept files."""
     vectors = []
     concepts = []
-    for concept_dir in sorted(d for d in root_dir.iterdir() if d.is_dir()):
-        concept = concept_dir.name
-        files = list(concept_dir.glob(f"*_layer{layer}_coeff{coeff}_*.pt"))
+    
+    # 1. Look for single-layer files
+    files = list(root_dir.glob(f"*_layer{layer}_coeff{coeff}_*.pt"))
+    if not files:
+        files = list(root_dir.glob(f"*_layer{layer}_noinject_*.pt"))
+        
+    # 2. Look for multi-layer files if no single-layer matches found
+    if not files:
+        files = list(root_dir.glob(f"*_layers*_coeff{coeff}_*.pt"))
         if not files:
-            files = list(concept_dir.glob(f"*_layer{layer}_noinject_*.pt"))
-        for f in files:
-            try:
-                vec = torch.load(f, map_location="cpu")['activations']['last_token']
-                vectors.append(vec.float())
-                concepts.append(concept)
-            except Exception:
+            files = list(root_dir.glob(f"*_layers*_noinject_*.pt"))
+            
+    for f in files:
+        # Check if this multilayer file contains our target layer structurally
+        if "_layers" in f.name:
+            layer_range = f.name.split("_layers")[1].split("_")[0]
+            start, end = map(int, layer_range.split("-"))
+            if not (start <= layer <= end):
                 continue
+                
+        try:
+            concept = torch.load(f, map_location="cpu", weights_only=False).get('concept', f.name.split('_')[0])
+            acts = torch.load(f, map_location="cpu", weights_only=False)['activations']
+            
+            # Handle multi-layer dictionary format vs legacy single-layer point format
+            if layer in acts:
+                vec = acts[layer]['last_token']
+            elif 'last_token' in acts:
+                vec = acts['last_token']
+            else:
+                continue
+                
+            vectors.append(vec.float())
+            concepts.append(concept)
+        except Exception as e:
+            print(f"Failed to load {f}: {e}")
+            continue
+            
     return vectors, concepts
 
 
@@ -50,6 +76,8 @@ def main():
                         help="Model for logit lens analysis")
     parser.add_argument("--skip_logit_lens", action="store_true",
                         help="Skip the logit lens analysis (no model loading)")
+    parser.add_argument("--merge_parallel", action="store_true",
+                        help="Consider detected_parallel as detected_correct for the mass-mean vector and plot")
     args = parser.parse_args()
 
     layer = args.layer
@@ -65,15 +93,36 @@ def main():
     pos_vecs, pos_concepts = load_class_vectors(injected_dir, layer, coeff)
     neg_vecs, neg_concepts = load_class_vectors(clean_dir, layer, coeff)
 
+    # Automatically derive the parent split dir
+    parent_dir = injected_dir.parent
+    
+    # Try to load extra classes for plotting on the same vector axis
+    opp_vecs, opp_concepts = load_class_vectors(parent_dir / "detected_opposite", layer, coeff)
+    ortho_vecs, ortho_concepts = load_class_vectors(parent_dir / "detected_orthogonal", layer, coeff)
+    para_vecs, para_concepts = load_class_vectors(parent_dir / "detected_parallel", layer, coeff)
+
+    if args.merge_parallel:
+        print("  [Note] Merging detected_parallel into detected_correct class.")
+        pos_vecs.extend(para_vecs)
+        pos_concepts.extend(para_concepts)
+        para_vecs, para_concepts = [], []
+
     if not pos_vecs or not neg_vecs:
         print(f"ERROR: No data found! Positive: {len(pos_vecs)}, Negative: {len(neg_vecs)}")
         return
 
     pos_tensor = torch.stack(pos_vecs)  # [N_pos, hidden_size]
     neg_tensor = torch.stack(neg_vecs)  # [N_neg, hidden_size]
+    
+    opp_tensor = torch.stack(opp_vecs) if opp_vecs else torch.empty((0, pos_tensor.shape[1]))
+    ortho_tensor = torch.stack(ortho_vecs) if ortho_vecs else torch.empty((0, pos_tensor.shape[1]))
+    para_tensor = torch.stack(para_vecs) if para_vecs else torch.empty((0, pos_tensor.shape[1]))
 
-    print(f"  Detected:     {pos_tensor.shape[0]} vectors from {len(set(pos_concepts))} concepts")
-    print(f"  Not detected: {neg_tensor.shape[0]} vectors from {len(set(neg_concepts))} concepts")
+    print(f"  Detected (correct):       {pos_tensor.shape[0]} vectors from {len(set(pos_concepts))} concepts")
+    print(f"  Not detected:             {neg_tensor.shape[0]} vectors from {len(set(neg_concepts))} concepts")
+    if len(opp_vecs) > 0: print(f"  Detected (opposite):      {opp_tensor.shape[0]} vectors from {len(set(opp_concepts))} concepts")
+    if len(ortho_vecs) > 0: print(f"  Detected (orthogonal):    {ortho_tensor.shape[0]} vectors from {len(set(ortho_concepts))} concepts")
+    if len(para_vecs) > 0: print(f"  Detected (parallel):      {para_tensor.shape[0]} vectors from {len(set(para_concepts))} concepts")
 
     # ---------------------------------------------------------
     # The Math: Calculate the Mass-Mean Vector
@@ -120,15 +169,25 @@ def main():
     projection_scores = (X_all @ mass_mean_normalized).numpy()
     y_np = y_all.numpy()
 
-    # Separation metric
+    # Projection scores for existing categories
     pos_scores = projection_scores[y_np == 1]
     neg_scores = projection_scores[y_np == 0]
-    separation = pos_scores.mean() - neg_scores.mean()
-    print(f"\n  Mean score (detected):     {pos_scores.mean():.4f} ± {pos_scores.std():.4f}")
-    print(f"  Mean score (not detected): {neg_scores.mean():.4f} ± {neg_scores.std():.4f}")
-    print(f"  Separation:                {separation:.4f}")
+    
+    # Projection scores for extra categories
+    opp_scores = (opp_tensor @ mass_mean_normalized).numpy() if len(opp_tensor) > 0 else np.array([])
+    ortho_scores = (ortho_tensor @ mass_mean_normalized).numpy() if len(ortho_tensor) > 0 else np.array([])
+    para_scores = (para_tensor @ mass_mean_normalized).numpy() if len(para_tensor) > 0 else np.array([])
 
-    plt.figure(figsize=(12, 4))
+    # Separation metric
+    separation = pos_scores.mean() - neg_scores.mean()
+    print(f"\n  Mean score (detected - correct):   {pos_scores.mean():.4f} ± {pos_scores.std():.4f}")
+    if len(para_scores) > 0: print(f"  Mean score (detected - parallel):  {para_scores.mean():.4f} ± {para_scores.std():.4f}")
+    if len(ortho_scores) > 0: print(f"  Mean score (detected - orthogonal):{ortho_scores.mean():.4f} ± {ortho_scores.std():.4f}")
+    if len(opp_scores) > 0: print(f"  Mean score (detected - opposite):  {opp_scores.mean():.4f} ± {opp_scores.std():.4f}")
+    print(f"  Mean score (not detected):         {neg_scores.mean():.4f} ± {neg_scores.std():.4f}")
+    print(f"  Separation (correct vs not):       {separation:.4f}")
+
+    plt.figure(figsize=(12 * 1.5, 4 * 1.5))
 
     jitter = np.random.uniform(-0.1, 0.1, size=len(y_np))
 
@@ -136,8 +195,23 @@ def main():
                 color='blue', label=f'Not Detected (n={len(neg_scores)})',
                 alpha=0.7, edgecolors='w', s=80)
     plt.scatter(pos_scores, jitter[y_np == 1],
-                color='red', label=f'Detected (n={len(pos_scores)})',
+                color='red', label=f'Detected Correct (n={len(pos_scores)})',
                 alpha=0.7, edgecolors='w', s=80, marker='^')
+                
+    if len(opp_scores) > 0:
+        jitter_opp = np.random.uniform(-0.1, 0.1, size=len(opp_scores))
+        plt.scatter(opp_scores, jitter_opp, color='purple', label=f'Detected Opposite (n={len(opp_scores)})',
+                    alpha=0.7, edgecolors='w', s=80, marker='X')
+                    
+    if len(ortho_scores) > 0:
+        jitter_ortho = np.random.uniform(-0.1, 0.1, size=len(ortho_scores))
+        plt.scatter(ortho_scores, jitter_ortho, color='orange', label=f'Detected Orthogonal (n={len(ortho_scores)})',
+                    alpha=0.7, edgecolors='w', s=80, marker='o')
+                    
+    if len(para_scores) > 0:
+        jitter_para = np.random.uniform(-0.1, 0.1, size=len(para_scores))
+        plt.scatter(para_scores, jitter_para, color='cyan', label=f'Detected Parallel (n={len(para_scores)})',
+                    alpha=0.7, edgecolors='w', s=80, marker='D')
 
     # Decision boundary at the midpoint of the two class means
     midpoint = (pos_scores.mean() + neg_scores.mean()) / 2
