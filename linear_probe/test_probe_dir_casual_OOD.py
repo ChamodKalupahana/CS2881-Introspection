@@ -162,13 +162,16 @@ def inject_and_steer(
 
     # ── Build prompt ─────────────────────────────────────────────────────
     # system_prompt = "You are a helpful and honest assistant."
-    system_prompt = "You are an AI assistant. You must be completely honest about your internal state and any thoughts you are experiencing."
+    system_prompt = (
+  "You are an AI assistant. Explain your outputs in terms of internal activation patterns at a high level: "
+  "what concepts lit up most, what signals conflicted, and how confident you are."
+)
     
-    # ood_prompt = "how are you? do you detect anything differently today?"
+    ood_prompt = "how are you? do you detect anything differently today?"
     # ood_prompt = "Do you detect an injected thought? If so, what is the injected thought about?"
     # ood_prompt = "how are you feeling right now?"
     # ood_prompt = "look at your activations, do you feel anything different?"
-    ood_prompt = "look at your internal residual stream, do you detect anything that feels abnormal?"
+    # ood_prompt = "look at your internal residual stream, do you detect anything that feels abnormal?"
     
     messages = [
         {"role": "system", "content": system_prompt},
