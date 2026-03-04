@@ -276,6 +276,7 @@ def inject_and_capture_activations(
         prompt_acts = cap["prompt"] if cap["prompt"] is not None else torch.empty(0)
         return {
             "last_token":      gen_stack[-1] if len(gen_stack) > 0 else torch.zeros(hidden_size),
+            "prompt_last_token": prompt_acts[-1] if prompt_acts.numel() > 0 else torch.zeros(hidden_size),
             "prompt_mean":     prompt_acts.mean(dim=0) if prompt_acts.numel() > 0 else torch.zeros(hidden_size),
             "generation_mean": gen_stack.mean(dim=0) if len(gen_stack) > 0 else torch.zeros(hidden_size),
             "all_prompt":      prompt_acts,
