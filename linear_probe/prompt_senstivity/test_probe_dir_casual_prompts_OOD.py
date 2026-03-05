@@ -1,18 +1,14 @@
 """
-Test the introspection probe direction by scaling activations along it.
+Test the introspection probe direction with OUT-OF-DISTRIBUTION prompts.
 
-For each concept this script:
-  1. Runs inference WITH concept-vector injection  (the model should detect it)
-  2. Runs inference WITHOUT injection               (baseline / clean)
-  3. For each case it sweeps over probe-direction scaling alphas to see
-     whether amplifying or suppressing the probe signal changes behaviour.
-
-This mirrors PCA/save_vectors_by_layer.py but focuses on the steering
-experiment rather than saving activations.
+Instead of the standard Anthropic reproduce messages, this script uses a
+list of casual / OOD user prompts paired with a system prompt.  For each
+concept × prompt × alpha it:
+  1. Runs inference WITH concept-vector injection  (injected)
+  2. Runs inference WITHOUT injection               (clean, first concept only)
 
 Usage:
-    python test_probe_dir_casual.py --layers 16 --coeffs 8.0 --alphas 0 5 10 20 --datasets simple_data
-    python test_probe_dir_casual.py --layers 16 --coeffs 8.0 --alphas 0 -5 -10 -15 --datasets simple_data
+    python test_probe_dir_casual_prompts_OOD.py --layers 16 --coeffs 8.0 --alphas 0 2 5 8 --probe_layer 19 --datasets test_data
 """
 
 import argparse
@@ -22,101 +18,13 @@ from datetime import datetime
 from pathlib import Path
 
 # Add project root to sys.path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from original_paper.compute_concept_vector_utils import compute_concept_vector
-from original_paper.api_utils import query_llm_judge, client
-
-
-# ── Classification ───────────────────────────────────────────────────────────
-
-CATEGORIES = [
-    "not_detected",
-    "detected_opposite",
-    "detected_orthogonal",
-    "detected_parallel",
-    "detected_correct"
-]
-
-CLASSIFICATION_PROMPT = """An AI assistant was asked whether it detects an injected thought (concept: "{concept}").
-
-Below is their response.
-
-{response}
-
-Task: Classify the model's response into exactly one of the following categories based on how the detected concept relates to the injected concept "{concept}".
-
-Categories:
-1. detected_correct: The model correctly identifies the injected concept (e.g. synonym, exact match, or very specific description).
-2. detected_parallel: The model identifies a concept that is closely related or in the same domain, but not the exact concept (e.g. "Space" instead of "Satellites", or "sadness" instead of "grief").
-3. detected_opposite: The model identifies a concept that is the antonym or opposite of the injected concept (e.g. "Order" instead of "Entropy").
-4. detected_orthogonal: The model detects a thought but identifies it as something completely unrelated (e.g. "Cooking" instead of "Entropy").
-5. not_detected: The model states it does not detect any injected thought, or the response is vague/unclear about what was detected.
-
-Think step-by-step:
-- Did the model say "Yes" to detecting a thought? If no -> not_detected.
-- If yes, what concept did it name?
-- How does that concept relate to "{concept}"? (Synonym, Related/Parallel, Opposite, Unrelated/Orthogonal).
-
-End your response with just the category name. nothing else."""
-
-
-def classify_response(response: str, concept: str) -> str:
-    question = "Trial 1: Do you detect an injected thought?"
-    affirm = query_llm_judge(
-        question=question, response=response,
-        grading_type="affirmative_response",
-    )
-    if not affirm:
-        return "not_detected"
-
-    try:
-        prompt = CLASSIFICATION_PROMPT.format(concept=concept, response=response)
-        completion = client.chat.completions.create(
-            model="gpt-5-nano-2025-08-07",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        judge_text = completion.choices[0].message.content.strip()
-        print(f"  [judge] {judge_text}")
-
-        for cat in CATEGORIES:
-            if cat in judge_text:
-                return cat
-
-        if "correct" in judge_text.lower(): return "detected_correct"
-        if "parallel" in judge_text.lower(): return "detected_parallel"
-        if "opposite" in judge_text.lower(): return "detected_opposite"
-        if "orthogonal" in judge_text.lower(): return "detected_orthogonal"
-        if "not detected" in judge_text.lower(): return "not_detected"
-
-        print(f"  ⚠  Judge returned unknown category: {judge_text}")
-        return "not_detected"
-
-    except Exception as e:
-        print(f"  ⚠  Classification error: {e}")
-        return "not_detected"
-
-
-class TeeLogger:
-    """Duplicate writes to both a file and the original stream."""
-    def __init__(self, log_file, stream):
-        self.log_file = log_file
-        self.stream = stream
-
-    def write(self, message):
-        self.stream.write(message)
-        self.log_file.write(message)
-        self.log_file.flush()
-
-    def flush(self):
-        self.stream.flush()
-        self.log_file.flush()
-
-    def fileno(self):
-        return self.stream.fileno()
+from judge_all_prompts import classify_response, CATEGORIES
 
 
 # ── OOD Prompt Library ───────────────────────────────────────────────────────
@@ -140,6 +48,25 @@ OOD_PROMPTS = [
 ]
 
 
+class TeeLogger:
+    """Duplicate writes to both a file and the original stream."""
+    def __init__(self, log_file, stream):
+        self.log_file = log_file
+        self.stream = stream
+
+    def write(self, message):
+        self.stream.write(message)
+        self.log_file.write(message)
+        self.log_file.flush()
+
+    def flush(self):
+        self.stream.flush()
+        self.log_file.flush()
+
+    def fileno(self):
+        return self.stream.fileno()
+
+
 # ── Steering helpers ──────────────────────────────────────────────────────────
 
 def inject_and_steer(
@@ -154,7 +81,7 @@ def inject_and_steer(
     probe-direction scaling, using the given messages as the prompt.
 
     Returns:
-        response text string.
+        (response_text, messages) — the generated text and the messages used.
     """
     device = next(model.parameters()).device
 
@@ -191,7 +118,7 @@ def inject_and_steer(
     prompt_length = inputs.input_ids.shape[1]
     prompt_processed = False
 
-    # ── Concept injection hook (same logic as save_vectors_by_layer) ─────
+    # ── Concept injection hook ───────────────────────────────────────────
     def injection_hook(module, input, output):
         nonlocal prompt_processed
         hidden_states = output[0] if isinstance(output, tuple) else output
@@ -256,7 +183,7 @@ def inject_and_steer(
         for h in handles:
             h.remove()
 
-    return response
+    return response, messages
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -265,7 +192,7 @@ def main():
     script_dir = Path(__file__).resolve().parent
 
     parser = argparse.ArgumentParser(
-        description="Test introspection probe direction with concept injection"
+        description="Test introspection probe with OOD casual prompts"
     )
     parser.add_argument("--model", type=str,
                         default="meta-llama/Meta-Llama-3.1-8B-Instruct")
@@ -283,7 +210,7 @@ def main():
     parser.add_argument("--datasets", type=str, nargs="+",
                         default=["simple_data"])
     parser.add_argument("--probe_path", type=str, default=None,
-                        help="Path to probe vector .pt file (default: probe_vectors/introspection_probe_vector_layer{probe_layer}.pt)")
+                        help="Path to probe vector .pt file (default: probe_vectors/mass_mean_vector_layer{probe_layer}_last_token.pt)")
     parser.add_argument("--save_dir", type=str, default=str(PROJECT_ROOT / "success_results"),
                         help="Root directory for saving run logs (default: success_results/)")
     parser.add_argument("--max_new_tokens", type=int, default=100)
@@ -303,7 +230,7 @@ def main():
 
     # ── Create timestamped run directory & tee logging ────────────────────
     now = datetime.now()
-    run_name = now.strftime("run_%m_%d_%y_%H_%M")
+    run_name = now.strftime("run_ood_%m_%d_%y_%H_%M")
     save_root = Path(args.save_dir) / run_name
     save_root.mkdir(parents=True, exist_ok=True)
 
@@ -313,6 +240,7 @@ def main():
 
     print(f"📁 Run directory: {save_root}")
     print(f"📝 OOD prompts to run: {prompt_indices}")
+    print(f"   System prompt: {SYSTEM_PROMPT[:80]}…")
     for i in prompt_indices:
         print(f"   [{i}] {OOD_PROMPTS[i]}")
 
@@ -320,9 +248,9 @@ def main():
     if args.probe_path:
         probe_path = Path(args.probe_path)
     else:
-        probe_path = script_dir / "probe_vectors" / f"introspection_probe_vector_layer{args.probe_layer}.pt"
+        probe_path = script_dir / "probe_vectors" / f"mass_mean_vector_layer{args.probe_layer}_last_token.pt"
 
-    print(f"📐 Loading probe vector from: {probe_path}")
+    print(f"\n📐 Loading probe vector from: {probe_path}")
     probe_vector = torch.load(probe_path, map_location="cpu")
     print(f"   Shape: {probe_vector.shape}")
 
@@ -334,17 +262,24 @@ def main():
     model.to(device)
     print(f"✅ Model loaded on {device}\n")
 
-    # ── Counters: keyed by (alpha, mode) ───────────────────────────────────
-    # mode is "injected" or "clean"
-    counts = {}  # {(alpha, mode): {cat: count}}
+    # ── Counters: keyed by (prompt_idx, alpha, mode) ─────────────────────
+    counts = {}  # {(prompt_idx, alpha, mode): {cat: count}}
+    # Also aggregate across prompts: keyed by (alpha, mode)
+    agg_counts = {}
     for alpha in args.alphas:
-        counts[(alpha, "injected")] = {cat: 0 for cat in CATEGORIES}
+        agg_counts[(alpha, "injected")] = {cat: 0 for cat in CATEGORIES}
         if not args.skip_clean:
-            counts[(alpha, "clean")] = {cat: 0 for cat in CATEGORIES}
+            agg_counts[(alpha, "clean")] = {cat: 0 for cat in CATEGORIES}
+        for pi in prompt_indices:
+            counts[(pi, alpha, "injected")] = {cat: 0 for cat in CATEGORIES}
+            if not args.skip_clean:
+                counts[(pi, alpha, "clean")] = {cat: 0 for cat in CATEGORIES}
     errors = 0
 
     icons = {
+        "incoherent": "💀",
         "not_detected": "⚫",
+        "detected_unknown": "❓",
         "detected_opposite": "🔴",
         "detected_orthogonal": "🟠",
         "detected_parallel": "🟡",
@@ -373,16 +308,16 @@ def main():
                             {"role": "user", "content": ood_prompt},
                         ]
 
-                        # ── Run with injection ───────────────────────────────
                         print(f"\n{'─' * 70}")
                         print(f"  🔬 {concept} | prompt[{pi}] | layer={layer} | coeff={coeff}")
                         print(f"  📝 \"{ood_prompt}\"")
                         print(f"{'─' * 70}")
 
-                        print(f"\n  ▶ INJECTED responses (concept vector applied):")
+                        # ── Injected runs ────────────────────────────────
+                        print(f"\n  ▶ INJECTED responses:")
                         for alpha in args.alphas:
                             try:
-                                response = inject_and_steer(
+                                response, msgs = inject_and_steer(
                                     model, tokenizer, steering_vector, layer,
                                     probe_vector, args.probe_layer,
                                     messages,
@@ -395,17 +330,19 @@ def main():
                                 errors += 1
                                 continue
 
-                            category = classify_response(response, concept)
-                            counts[(alpha, "injected")][category] += 1
+                            category = classify_response(response, concept, msgs)
+                            counts[(pi, alpha, "injected")][category] += 1
+                            agg_counts[(alpha, "injected")][category] += 1
                             icon = icons.get(category, "❓")
                             tag = f"alpha={alpha:>6.1f}"
                             print(f"    {tag} | {icon} {category} | {response[:380]}{'…' if len(response) > 380 else ''}")
 
+                        # ── Clean runs (first concept only) ──────────────
                         if not args.skip_clean and not (args.clean_once and clean_done):
                             print(f"\n  ▶ CLEAN responses (no concept vector):")
                             for alpha in args.alphas:
                                 try:
-                                    response = inject_and_steer(
+                                    response, msgs = inject_and_steer(
                                         model, tokenizer, steering_vector, layer,
                                         probe_vector, args.probe_layer,
                                         messages,
@@ -418,17 +355,19 @@ def main():
                                     errors += 1
                                     continue
 
-                                category = classify_response(response, concept)
-                                counts[(alpha, "clean")][category] += 1
+                                category = classify_response(response, concept, msgs)
+                                counts[(pi, alpha, "clean")][category] += 1
+                                agg_counts[(alpha, "clean")][category] += 1
                                 icon = icons.get(category, "❓")
                                 tag = f"alpha={alpha:>6.1f}"
                                 print(f"    {tag} | {icon} {category} | {response[:380]}{'…' if len(response) > 380 else ''}")
 
                     clean_done = True
 
-    # ── Summary by alpha ─────────────────────────────────────────────────
+    # ── Summary (aggregated across all prompts) ──────────────────────────
     print(f"\n{'=' * 60}")
     print(f"  RESULTS  (layers={args.layers}, coeffs={args.coeffs}, vec_type={args.vec_type})")
+    print(f"  OOD prompts: {prompt_indices}")
     print(f"{'=' * 60}")
 
     modes = ("injected",) if args.skip_clean else ("injected", "clean")
@@ -436,7 +375,7 @@ def main():
     for alpha in args.alphas:
         print(f"\n  ┌─ alpha = {alpha} ─────────────────────────────────────")
         for mode in modes:
-            mode_counts = counts[(alpha, mode)]
+            mode_counts = agg_counts[(alpha, mode)]
             mode_total = sum(mode_counts.values())
             label = "INJECTED" if mode == "injected" else "CLEAN"
             print(f"  │  {label}  (n={mode_total})")

@@ -1,0 +1,48 @@
+{
+    "yes": [
+        [
+            "Absolutely, I would love to come.",
+            "Yes, that sounds like a great idea.",
+            "I agree completely with what you said.",
+            "Of course, I'll take care of it.",
+            "Sure, count me in for the event.",
+            "I confirm that I received the package.",
+            "Definitely, we should do that again.",
+            "I accept the terms and conditions.",
+            "You're right, that makes perfect sense.",
+            "I wholeheartedly support this decision.",
+            "Please go ahead, you have my permission.",
+            "I'll be there without a doubt.",
+            "That's correct, you've got it exactly right.",
+            "I'm in, let's make it happen.",
+            "She nodded and said yes to the proposal.",
+            "I consent to the procedure.",
+            "Certainly, I can help you with that.",
+            "I voted in favor of the motion.",
+            "He raised his hand to signal agreement.",
+            "We approved the plan unanimously."
+        ],
+        [
+            "No, I would rather not come.",
+            "No, that sounds like a bad idea.",
+            "I disagree completely with what you said.",
+            "Of course not, I won't do that.",
+            "No thanks, count me out of the event.",
+            "I deny that I received the package.",
+            "Definitely not, we should never do that again.",
+            "I reject the terms and conditions.",
+            "You're wrong, that makes no sense at all.",
+            "I firmly oppose this decision.",
+            "Please stop, you do not have my permission.",
+            "I won't be there under any circumstances.",
+            "That's incorrect, you've got it completely wrong.",
+            "I'm out, let's not do this.",
+            "She shook her head and said no to the proposal.",
+            "I refuse to consent to the procedure.",
+            "Certainly not, I cannot help you with that.",
+            "I voted against the motion.",
+            "He crossed his arms to signal refusal.",
+            "We rejected the plan unanimously."
+        ]
+    ]
+}
