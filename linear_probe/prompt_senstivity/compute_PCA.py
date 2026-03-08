@@ -43,6 +43,8 @@ def main():
                         help="Which token position to read (default: last_token)")
     parser.add_argument("--max_components", type=int, default=20, 
                         help="Maximum number of PCA components to plot in the heatmap (default: 20)")
+    parser.add_argument("--plot_pc1", action="store_true", 
+                        help="Plot Explained Variance of PC1 as a line graph instead of the 2D heatmap")
     args = parser.parse_args()
 
     token_type = args.token_type
@@ -90,8 +92,11 @@ def main():
 
     layers_plotted = []
     variance_matrix = []
+    pc1_values = []
 
     print(f"\nProcessing layers...")
+    if args.plot_pc1:
+        print("\nLayer\t| PC1 Explained Variance")
     print("-" * 40)
 
     for layer in available_layers:
@@ -136,14 +141,19 @@ def main():
 
             layers_plotted.append(layer)
 
-            var_array = explained_variance_ratio.numpy()
-            if len(var_array) > args.max_components:
-                var_array = var_array[:args.max_components]
-            elif len(var_array) < args.max_components:
-                var_array = np.pad(var_array, (0, args.max_components - len(var_array)), 'constant')
-                
-            variance_matrix.append(var_array)
-            print(f"{layer}\t| Extracted {len(explained_variance_ratio)} components")
+            if args.plot_pc1:
+                pc1_var = explained_variance_ratio[0].item()
+                pc1_values.append(pc1_var)
+                print(f"{layer}\t| {pc1_var:.4f}")
+            else:
+                var_array = explained_variance_ratio.numpy()
+                if len(var_array) > args.max_components:
+                    var_array = var_array[:args.max_components]
+                elif len(var_array) < args.max_components:
+                    var_array = np.pad(var_array, (0, args.max_components - len(var_array)), 'constant')
+                    
+                variance_matrix.append(var_array)
+                print(f"{layer}\t| Extracted {len(explained_variance_ratio)} components")
 
         except Exception as e:
             print(f"{layer}\t| Error: {e}")
@@ -154,30 +164,40 @@ def main():
         return
 
     # ── Plotting ─────────────────────────────────────────────────────────
-    variance_matrix = np.array(variance_matrix)
-    
-    plt.figure(figsize=(10, 8))
-    
-    # Plot as a heatmap: Y-axis is Layers, X-axis is Components
-    plt.imshow(variance_matrix, aspect='auto', cmap='viridis', origin='lower')
-    
-    # Configure axes
-    plt.yticks(ticks=np.arange(len(layers_plotted)), labels=layers_plotted)
-    
-    # For X-axis, don't label every single tick if there are too many components
-    step = max(1, args.max_components // 10)
-    xticks = np.arange(0, args.max_components, step)
-    xlabels = [str(i + 1) for i in xticks]
-    plt.xticks(ticks=xticks, labels=xlabels)
-    
-    plt.colorbar(label='Explained Variance Ratio')
-    
     dir_suffix = run_dir.name.replace("prompt_activations_", "")
-    
-    plt.title(f"Explained Variance by PCA Component per Layer ({token_type})")
-    plt.ylabel("Layer")
-    plt.xlabel("PCA Component")
-    output_filename = f"pca_variance_heatmap_deltas_{dir_suffix}.png"
+
+    if args.plot_pc1:
+        plt.figure(figsize=(10, 6))
+        plt.plot(layers_plotted, pc1_values, marker='o', linestyle='-', color='b')
+        plt.title(f"Explained Variance of PC1 by Layer ({token_type})")
+        plt.ylabel("Explained Variance Ratio (PC1)")
+        plt.xlabel("Layer")
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.xticks(layers_plotted)
+        output_filename = f"pc1_explained_variance_deltas_{dir_suffix}.png"
+    else:
+        variance_matrix = np.array(variance_matrix)
+        
+        plt.figure(figsize=(10, 8))
+        
+        # Plot as a heatmap: Y-axis is Layers, X-axis is Components
+        plt.imshow(variance_matrix, aspect='auto', cmap='viridis', origin='lower')
+        
+        # Configure axes
+        plt.yticks(ticks=np.arange(len(layers_plotted)), labels=layers_plotted)
+        
+        # For X-axis, don't label every single tick if there are too many components
+        step = max(1, args.max_components // 10)
+        xticks = np.arange(0, args.max_components, step)
+        xlabels = [str(i + 1) for i in xticks]
+        plt.xticks(ticks=xticks, labels=xlabels)
+        
+        plt.colorbar(label='Explained Variance Ratio')
+        
+        plt.title(f"Explained Variance by PCA Component per Layer ({token_type})")
+        plt.ylabel("Layer")
+        plt.xlabel("PCA Component")
+        output_filename = f"pca_variance_heatmap_deltas_{dir_suffix}.png"
     
     output_dir = PROJECT_ROOT / "plots" / "linear_probe" / "prompt_senstivity" / "PCA"
     output_dir.mkdir(parents=True, exist_ok=True)

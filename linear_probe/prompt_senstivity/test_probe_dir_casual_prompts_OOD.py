@@ -246,6 +246,9 @@ def main():
                         help="Which OOD prompt indices to run (default: all)")
     parser.add_argument("--continuous_steering", action="store_true",
                         help="Add the probe vector to the entire sequence instead of just the last token")
+    parser.add_argument("--token_type", type=str, default="last_token",
+                        choices=["last_token", "prompt_last_token"],
+                        help="Which token type vector to load (default: last_token)")
     args = parser.parse_args()
 
     # Resolve which prompts to run
@@ -274,7 +277,7 @@ def main():
     if args.probe_path:
         probe_path = Path(args.probe_path)
     else:
-        probe_path = script_dir / "probe_vectors" / f"mass_mean_vector_layer{args.probe_layer}_last_token.pt"
+        probe_path = script_dir / "probe_vectors" / f"mass_mean_vector_layer{args.probe_layer}_{args.token_type}.pt"
 
     print(f"\n📐 Loading probe vector from: {probe_path}")
     probe_vector = torch.load(probe_path, map_location="cpu")
