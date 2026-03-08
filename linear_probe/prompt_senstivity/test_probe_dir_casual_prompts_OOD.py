@@ -75,6 +75,7 @@ def inject_and_steer(
     messages,
     coeff=10.0, alpha=0.0,
     max_new_tokens=100, skip_inject=False,
+    continuous_steering=False,
 ):
     """
     Run inference with optional concept-vector injection AND optional
@@ -117,6 +118,7 @@ def inject_and_steer(
     inputs = tokenizer(formatted_prompt, return_tensors="pt", add_special_tokens=False).to(device)
     prompt_length = inputs.input_ids.shape[1]
     prompt_processed = False
+    prompt_processed_probe = False
 
     # ── Concept injection hook ───────────────────────────────────────────
     def injection_hook(module, input, output):
@@ -147,9 +149,31 @@ def inject_and_steer(
 
     # ── Probe direction steering hook ────────────────────────────────────
     def probe_steering_hook(module, input, output):
+        nonlocal prompt_processed_probe
         hidden_states = output[0] if isinstance(output, tuple) else output
         probe = pv.to(device=hidden_states.device, dtype=hidden_states.dtype)
-        hidden_states[:, -1, :] = hidden_states[:, -1, :] + alpha * probe
+        batch_size, seq_len, hidden_dim = hidden_states.shape
+
+        if continuous_steering:
+            steer_expanded = torch.zeros_like(hidden_states)
+            if injection_start_token is not None:
+                is_generating = (seq_len == 1 and prompt_processed_probe) or (seq_len > prompt_length)
+                if seq_len == prompt_length:
+                    prompt_processed_probe = True
+
+                if is_generating:
+                    steer_expanded[:, -1:, :] = probe
+                else:
+                    start_idx = max(0, injection_start_token)
+                    if start_idx < seq_len:
+                        steer_expanded[:, start_idx:, :] = probe.expand(batch_size, seq_len - start_idx, -1)
+            else:
+                steer_expanded[:, :, :] = probe
+                
+            hidden_states = hidden_states + alpha * steer_expanded
+        else:
+            hidden_states[:, -1, :] = hidden_states[:, -1, :] + alpha * probe
+
         if isinstance(output, tuple):
             return (hidden_states,) + output[1:]
         return hidden_states
@@ -220,6 +244,8 @@ def main():
                         help="Only run clean (no-injection) for the first concept")
     parser.add_argument("--prompts", type=int, nargs="*", default=None,
                         help="Which OOD prompt indices to run (default: all)")
+    parser.add_argument("--continuous_steering", action="store_true",
+                        help="Add the probe vector to the entire sequence instead of just the last token")
     args = parser.parse_args()
 
     # Resolve which prompts to run
@@ -324,6 +350,7 @@ def main():
                                     coeff=coeff, alpha=alpha,
                                     max_new_tokens=args.max_new_tokens,
                                     skip_inject=False,
+                                    continuous_steering=args.continuous_steering,
                                 )
                             except Exception as e:
                                 print(f"    alpha={alpha:>6.1f} | ⚠ Error: {e}")
@@ -349,6 +376,7 @@ def main():
                                         coeff=coeff, alpha=alpha,
                                         max_new_tokens=args.max_new_tokens,
                                         skip_inject=True,
+                                        continuous_steering=args.continuous_steering,
                                     )
                                 except Exception as e:
                                     print(f"    alpha={alpha:>6.1f} | ⚠ Error: {e}")

@@ -11,7 +11,10 @@ python compute_mass_mean_vector_prompts.py --layer 19 --token_type last_token --
 
 python test_probe_dir_casual_prompts.py --layers 16 --coeffs 8.0 --datasets test_data --alphas -8 0 2 5 8 16 24  --probe_layer 19 --clean_once
 
-python test_probe_dir_casual_prompts_OOD.py --layers 16 --coeffs 8.0 --datasets test_data --alphas -8 -5 0 2 5 8 16 --probe_layer 19 --clean_once --prompts 2 5
+python test_probe_dir_casual_prompts_OOD.py --layers 16 --coeffs 8.0 --datasets test_data --alphas -8 -5 0 2 5 8 16 24 --probe_layer 19 --clean_once --prompts 2 5
+python test_probe_dir_casual_prompts_OOD.py --layers 16 --coeffs 8.0 --datasets test_data --alphas -8 -5 0 2 5 8 16 24 --probe_layer 19 --clean_once --prompts 2 5 --continuous_steering
 
 python test_probe_dir_casual_prompts_OOD.py --layers 16 --coeffs 8.0 --datasets test_data --alphas -8 -5 -2 0 5 --probe_layer 19 --clean_once --prompts 3 6
 
+# for unified prompts
+python save_activations_prompts_unified.py --layer 16 --coeff 8.0 --datasets simple_data_expanded_embeddings
