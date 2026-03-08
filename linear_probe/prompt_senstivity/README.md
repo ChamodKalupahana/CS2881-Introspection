@@ -20,6 +20,11 @@ This folder contains tools for analyzing how sensitive the introspection probe i
   - This vector represents the specific internal state of "real" introspection.
   - Generates projection plots and logit lens analysis.
 
+- **`compute_PCA.py`**: Analyzes the dimensionality of the introspection signal across the network.
+  - Automatically matches positive and negative activations to compute a pure "introspection delta".
+  - Computes Principal Component Analysis (PCA) on these deltas for all layers (16→31).
+  - Outputs a 2D heatmap matrix showing the explained variance ratio for the top *k* components per layer.
+
 - **`test_probe_dir_casual_prompts.py`**: Tests the learned probe by steering the model's activations during generation.
   - Sweeps over `alpha` (scaling factor) to see if amplifying/suppressing the probe direction changes the model's detection behavior.
 
@@ -44,7 +49,13 @@ python compute_mass_mean_vector_prompts.py --layer 19 --token_type last_token
 python compute_mass_mean_vector_prompts.py --layer 19 --token_type prompt_last_token
 ```
 
-### 3. Test the Probe (Steering)
+### 3. Analyze Dimensionality via PCA
+```bash
+# Computes the variance explained by the top 8 PCA components across all recorded layers and plots a heatmap
+python compute_PCA.py --max_components 8
+```
+
+### 4. Test the Probe (Steering)
 ```bash
 python test_probe_dir_casual_prompts.py \
     --layers 16 --coeffs 8.0 \
@@ -53,7 +64,7 @@ python test_probe_dir_casual_prompts.py \
     --probe_layer 19
 ```
 
-### 4. Full Pipeline (via main.sh)
+### 5. Full Pipeline (via main.sh)
 ```bash
 bash main.sh
 ```

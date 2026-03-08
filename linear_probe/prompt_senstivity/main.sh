@@ -18,3 +18,5 @@ python test_probe_dir_casual_prompts_OOD.py --layers 16 --coeffs 8.0 --datasets 
 
 # for unified prompts
 python save_activations_prompts_unified.py --layer 16 --coeff 8.0 --datasets simple_data_expanded_embeddings
+
+python compute_PCA.py --max_components 8
