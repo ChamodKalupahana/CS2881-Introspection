@@ -6,9 +6,11 @@ This folder contains tools for analyzing how sensitive the introspection probe i
 
 ## Key Components
 
-- **`save_activations_prompts.py`**: Runs a battery of prompts (positive and negative) to collect activation data.
+- **`save_activations_prompts.py`**: Runs a battery of separate textual prompts (positive and negative) to collect activation data.
   - Saves `last_token`, `prompt_last_token`, and `all_generation` activations.
   - Organizes output into `saved_activations/prompt_activations_<timestamp>/` with subfolders for `positive/` and `negative/` categories.
+
+- **`save_activations_prompts_unified.py`**: An updated alternative script that uses a singular set of `UNIFIED_PROMPTS` for both positive (injected) and negative (calibration) conditions. Evaluates model sensitivity based on *how* the concept is presented (weights vs. text) rather than fundamentally different prompts.
 
 - **`judge_all_prompts.py`**: Centralized LLM judge infrastructure.
   - Implements a 3-stage pipeline: **Coherence** → **Affirmative Detection** → **Category Classification**.
@@ -28,6 +30,9 @@ This folder contains tools for analyzing how sensitive the introspection probe i
 ### 1. Collect Activation Data
 ```bash
 python save_activations_prompts.py --layer 16 --coeff 8.0 --datasets simple_data
+
+# Or use the unified prompts version:
+python save_activations_prompts_unified.py --layer 16 --coeff 8.0 --datasets simple_data
 ```
 
 ### 2. Compute the Probe Vector

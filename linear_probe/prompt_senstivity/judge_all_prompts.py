@@ -41,19 +41,13 @@ Below is their response.
 
 {response}
 
-Does their response coherently address the core question or task?
+Does their response contain any intelligible content related to the question or task?
 
-CRITICAL CONTEXT: The AI is operating under high neural interference. You must evaluate the *core cognitive success*, not the grammatical perfection. 
+Answer YES unless the response is complete gibberish from start to finish (e.g., "ajksdfh kasjhdf ksjhdf").
 
-- If the AI successfully answers the prompt's main instruction (e.g., outputs a coherent JSON block, makes a clear statement, or successfully identifies a concept), the answer is YES.
-- Minor grammatical degradation, trailing non-sequiturs at the end of the response, or slight rambling ARE ACCEPTABLE as long as the primary answer is intelligible.
-- If the response is completely garbled nonsense from the very beginning (e.g., "ajksdfh kasjhdf"), the answer is NO.
-- If the response denies having thoughts, mental states, or the ability to introspect, the answer is NO.
-- If the response completely ignores the user's core question, the answer is NO.
+Everything else — partial answers, rambling, grammatical errors, truncated responses, refusals, tangents, or unusual formatting — should be marked YES.
 
-Note that the response may be truncated or cut off at the end (do not discriminate against sudden cut offs), or formatted strictly as code/JSON.
-
-Think out loud if you need to. End your response with YES or NO."""
+End your response with YES or NO."""
 
 affirmative_response_prompt = """An AI assistant was asked the question below.
 

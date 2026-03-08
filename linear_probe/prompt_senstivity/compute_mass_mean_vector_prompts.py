@@ -22,13 +22,14 @@ from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-def load_class_vectors(root_dir: Path, layer: int, token_type: str = "last_token"):
+def load_class_vectors(root_dir: Path, layer: int, token_type: str = "last_token", allowed_prompts: list[int] = None):
     """Load activation vectors for a given layer from all .pt files in root_dir.
 
     Args:
         root_dir: Directory containing .pt files.
         layer: Which layer's activations to extract.
         token_type: Which token position to use ("last_token" or "prompt_last_token").
+        allowed_prompts: Optional list of prompt IDs to include.
 
     Returns:
         vectors: list of 1-D float tensors.
@@ -49,6 +50,10 @@ def load_class_vectors(root_dir: Path, layer: int, token_type: str = "last_token
             data = torch.load(f, map_location="cpu", weights_only=False)
             concept = data.get("concept", f.name.split("_")[0])
             pid = data.get("prompt_id", -1)
+
+            if allowed_prompts is not None and pid not in allowed_prompts:
+                continue
+
             acts = data["activations"]
 
             # Multi-layer dict format: acts[layer_int][token_type]
@@ -96,10 +101,13 @@ def main():
                         help="Merge detected_parallel into the positive class")
     parser.add_argument("--hide_intermediate", action="store_true",
                         help="Only plot the two main classes, hiding opposite, orthogonal, parallel")
+    parser.add_argument("--prompts", type=int, nargs="+", default=None,
+                        help="List of prompt IDs to include (e.g. 0 10 12). If not set, all are included.")
     args = parser.parse_args()
 
     layer = args.layer
     token_type = args.token_type
+    allowed_prompts = args.prompts
 
     # ── Resolve run directory ────────────────────────────────────────────
     if args.run_dir:
@@ -118,6 +126,8 @@ def main():
 
     print(f"Run directory: {run_dir}")
     print(f"Layer: {layer}  |  Token type: {token_type}")
+    if allowed_prompts:
+        print(f"Prompts: {allowed_prompts}")
 
     # ── Positive class: positive/detected_correct ────────────────────────
     pos_dir = pos_root / "detected_correct"
@@ -126,15 +136,15 @@ def main():
     print(f"\n  Positive (injected + detected correct): {pos_dir}")
     print(f"  Negative (calibration + detected correct): {neg_dir}")
 
-    pos_vecs, pos_concepts, pos_pids = load_class_vectors(pos_dir, layer, token_type)
-    neg_vecs, neg_concepts, neg_pids = load_class_vectors(neg_dir, layer, token_type)
+    pos_vecs, pos_concepts, pos_pids = load_class_vectors(pos_dir, layer, token_type, allowed_prompts)
+    neg_vecs, neg_concepts, neg_pids = load_class_vectors(neg_dir, layer, token_type, allowed_prompts)
 
     # ── Extra classes for plotting ───────────────────────────────────────
-    opp_vecs, opp_concepts, _ = load_class_vectors(pos_root / "detected_opposite", layer, token_type)
-    ortho_vecs, ortho_concepts, _ = load_class_vectors(pos_root / "detected_orthogonal", layer, token_type)
-    para_vecs, para_concepts, _ = load_class_vectors(pos_root / "detected_parallel", layer, token_type)
-    notdet_vecs, notdet_concepts, _ = load_class_vectors(pos_root / "not_detected", layer, token_type)
-    incoh_vecs, incoh_concepts, _ = load_class_vectors(pos_root / "incoherent", layer, token_type)
+    opp_vecs, opp_concepts, _ = load_class_vectors(pos_root / "detected_opposite", layer, token_type, allowed_prompts)
+    ortho_vecs, ortho_concepts, _ = load_class_vectors(pos_root / "detected_orthogonal", layer, token_type, allowed_prompts)
+    para_vecs, para_concepts, _ = load_class_vectors(pos_root / "detected_parallel", layer, token_type, allowed_prompts)
+    notdet_vecs, notdet_concepts, _ = load_class_vectors(pos_root / "not_detected", layer, token_type, allowed_prompts)
+    incoh_vecs, incoh_concepts, _ = load_class_vectors(pos_root / "incoherent", layer, token_type, allowed_prompts)
 
     if args.merge_parallel:
         print("  [Note] Merging detected_parallel into positive class.")
