@@ -45,6 +45,8 @@ def main():
                         help="Maximum number of PCA components to plot in the heatmap (default: 20)")
     parser.add_argument("--plot_pc1", action="store_true", 
                         help="Plot Explained Variance of PC1 as a line graph instead of the 2D heatmap")
+    parser.add_argument("--plot_mean_diff", action="store_true", 
+                        help="Plot mean(calibration_correct) - mean(detected_correct) projected onto PCA")
     parser.add_argument("--input_vector", type=str, default=None,
                         help="Path to an activation .pt file to compute dot product against PCA components")
     args = parser.parse_args()
@@ -88,8 +90,8 @@ def main():
             print(f"ERROR: Input vector file not found at {input_path}")
             return
 
-    # Intersect keys
-    common_keys = set(pos_map.keys()).intersection(set(neg_map.keys()))
+    # Intersect keys and sort them so order is deterministic
+    common_keys = sorted(list(set(pos_map.keys()).intersection(set(neg_map.keys()))))
     print(f"Found {len(common_keys)} matched (concept, prompt_id) pairs.")
 
     if not common_keys:
@@ -110,6 +112,7 @@ def main():
     pc1_values = []
     input_dots_matrix = []
     notdet_diff_matrix = []
+    mean_diff_matrix = []
 
     print(f"\nProcessing layers...")
     if args.plot_pc1:
@@ -146,18 +149,28 @@ def main():
         
         # Collect not_detected and pos_all for this layer
         notdet_vecs = []
-        for key, acts in notdet_map.items():
+        for key in sorted(notdet_map.keys()):
+            acts = notdet_map[key]
             if layer in acts:
                 vec = acts[layer].get(token_type)
                 if vec is not None:
                     notdet_vecs.append(vec.float())
         
         pos_all_vecs = []
-        for key, acts in pos_map.items():
+        for key in sorted(pos_map.keys()):
+            acts = pos_map[key]
             if layer in acts:
                 vec = acts[layer].get(token_type)
                 if vec is not None:
                     pos_all_vecs.append(vec.float())
+
+        neg_all_vecs = []
+        for key in sorted(neg_map.keys()):
+            acts = neg_map[key]
+            if layer in acts:
+                vec = acts[layer].get(token_type)
+                if vec is not None:
+                    neg_all_vecs.append(vec.float())
 
         try:
             # PCA matching previous script
@@ -220,6 +233,22 @@ def main():
                 notdet_diff_matrix.append(diff_proj)
             else:
                 notdet_diff_matrix.append(np.zeros(args.max_components))
+
+            # Store difference in means for calibration_correct vs pos_correct
+            if args.plot_mean_diff:
+                if neg_all_vecs and pos_all_vecs:
+                    mean_neg_all = torch.stack(neg_all_vecs).mean(dim=0)
+                    mean_pos_all = torch.stack(pos_all_vecs).mean(dim=0)
+                    mean_diff_calib = mean_neg_all - mean_pos_all
+                    diff_proj_calib = torch.matmul(Vh, mean_diff_calib).numpy()
+                    
+                    if len(diff_proj_calib) > args.max_components:
+                        diff_proj_calib = diff_proj_calib[:args.max_components]
+                    elif len(diff_proj_calib) < args.max_components:
+                        diff_proj_calib = np.pad(diff_proj_calib, (0, args.max_components - len(diff_proj_calib)), 'constant')
+                    mean_diff_matrix.append(diff_proj_calib)
+                else:
+                    mean_diff_matrix.append(np.zeros(args.max_components))
 
             if args.plot_pc1:
                 pc1_var = explained_variance_ratio[0].item()
@@ -335,6 +364,32 @@ def main():
             diff_plot_path = output_dir / diff_filename
             plt.savefig(diff_plot_path)
             print(f"Not Detected diff heatmap saved to {diff_plot_path}")
+
+        # Plot calibration_correct vs pos_correct diff heatmap
+        if args.plot_mean_diff and mean_diff_matrix:
+            mean_diff_np = np.array(mean_diff_matrix)
+            plt.figure(figsize=(10, 8))
+            
+            vmax = np.max(np.abs(mean_diff_np))
+            if vmax == 0:
+                vmax = 1.0  # avoid division by zero in cmap if empty
+                
+            plt.imshow(mean_diff_np, aspect='auto', cmap='RdBu_r', origin='lower', 
+                       vmin=-vmax, vmax=vmax)
+            
+            plt.yticks(ticks=np.arange(len(layers_plotted)), labels=layers_plotted)
+            plt.xticks(ticks=xticks, labels=xlabels)
+            
+            plt.colorbar(label='Dot Product Value (Mean Calibration - Mean Pos Correct)')
+            
+            plt.title(f"Projection of (Calibration - Pos Correct) onto PCA ({token_type})")
+            plt.ylabel("Layer")
+            plt.xlabel("PCA Component")
+            
+            diff_filename2 = f"pca_mean_diff_heatmap_{dir_suffix}.png"
+            diff_plot_path2 = output_dir / diff_filename2
+            plt.savefig(diff_plot_path2)
+            print(f"Mean diff heatmap saved to {diff_plot_path2}")
 
 if __name__ == "__main__":
     main()

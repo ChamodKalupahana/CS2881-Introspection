@@ -26,5 +26,7 @@ python compute_PCA.py --max_components 8
 # for just one prompt
 python save_activations_prompts_unified.py --layer 16 --coeff 8.0 --datasets simple_data_expanded_embeddings --positive_prompts 0 --negative_prompts 0
 
-python compute_PCA.py --input_vector saved_activations/prompt_activations_03_10_26_19_27/postive_no_inject/not_detected/baseline_p0_layers16-31_noinject.pt --max_components 10
-Run directory: /workspace/CS2881-Introspection/linear_probe/prompt_senstivity/saved_activations/prompt_activations_03_10_26_19_27
+python compute_PCA.py --input_vector saved_activations/prompt_activations_03_10_26_19_27/postive_no_inject/not_detected/baseline_p0_layers16-31_noinject.pt --max_components 8
+
+# validate pca dir after analysuing compute_PCA.py plots
+python validate_vector.py --input_vector saved_activations/prompt_activations_03_10_26_19_27/pca_components/last_token_layer_21_pca.pt --pca_index 2 --layer 21 --prompts 0
