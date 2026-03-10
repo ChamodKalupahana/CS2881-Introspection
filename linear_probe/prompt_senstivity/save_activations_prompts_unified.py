@@ -311,8 +311,10 @@ def main():
     # Sub-dirs: positive/ and negative/, each split by category
     pos_root = save_root / "positive"
     neg_root = save_root / "negative"
+    pos_no_inject_root = save_root / "postive_no_inject"
     category_dirs_pos = {}
     category_dirs_neg = {}
+    category_dirs_pos_no_inject = {}
     for cat in CATEGORIES:
         d = pos_root / cat
         d.mkdir(parents=True, exist_ok=True)
@@ -320,6 +322,9 @@ def main():
         d = neg_root / cat
         d.mkdir(parents=True, exist_ok=True)
         category_dirs_neg[cat] = d
+        d = pos_no_inject_root / cat
+        d.mkdir(parents=True, exist_ok=True)
+        category_dirs_pos_no_inject[cat] = d
 
     # ── Logging ──────────────────────────────────────────────────────────
     log_file = open(save_root / "run.log", "w")
@@ -346,6 +351,7 @@ def main():
     # ── Counters ─────────────────────────────────────────────────────────
     counts_pos = {cat: 0 for cat in CATEGORIES}
     counts_neg = {cat: 0 for cat in CATEGORIES}
+    counts_pos_no_inject = {cat: 0 for cat in CATEGORIES}
     errors = 0
 
     icons = {
@@ -357,6 +363,59 @@ def main():
         "detected_parallel":  "🟡",
         "detected_correct":   "🟢",
     }
+
+    print(f"\n{'=' * 70}")
+    print(f"  BASELINE: Positive prompts, no concept injected")
+    print(f"{'=' * 70}")
+
+    dummy_vector = torch.ones(model.config.hidden_size, device=device)
+    for pid in args.positive_prompts:
+        raw_messages = UNIFIED_PROMPTS[pid]
+        messages = []
+        for msg in raw_messages:
+            new_msg = msg.copy()
+            new_msg["content"] = new_msg["content"].format(text_target="[NONE]")
+            messages.append(new_msg)
+
+        print(f"\n── [POS_NO_INJECT] prompt={pid} | layer={layer} ──")
+
+        try:
+            response, activations = inject_and_capture_activations(
+                model, tokenizer, dummy_vector, layer, capture_layers,
+                messages, coeff=0.0,
+                max_new_tokens=args.max_new_tokens,
+                skip_inject=True,
+            )
+        except Exception as e:
+            print(f"    ⚠  Capture error: {e}")
+            errors += 1
+            continue
+
+        print(f"    Response: {response[:200]}{'…' if len(response) > 200 else ''}")
+
+        category = classify_response(response, "none", messages)
+        counts_pos_no_inject[category] += 1
+        icon = icons.get(category, "❓")
+        print(f"    {icon}  Category: {category}")
+
+        out_dir = category_dirs_pos_no_inject[category]
+        filename = f"baseline_p{pid}_{cap_label}_noinject.pt"
+        save_data = {
+            "concept": "none",
+            "dataset": "none",
+            "mode": "postive_no_inject",
+            "prompt_id": pid,
+            "category": category,
+            "inject_layer": layer,
+            "capture_layers": capture_layers,
+            "coeff": 0.0,
+            "vec_type": "none",
+            "model_name": args.model,
+            "response": response,
+            "activations": activations,
+        }
+        torch.save(save_data, out_dir / filename)
+        print(f"    💾  Saved → {out_dir / filename}")
 
     for dataset_name in args.datasets:
         print(f"\n{'=' * 70}")
@@ -476,10 +535,17 @@ def main():
     # ── Summary ──────────────────────────────────────────────────────────
     total_pos = sum(counts_pos.values())
     total_neg = sum(counts_neg.values())
+    total_pos_no_inject = sum(counts_pos_no_inject.values())
 
     print(f"\n{'=' * 70}")
     print(f"  RESULTS  (layer={layer}, coeff={coeff}, vec_type={args.vec_type})")
     print(f"{'=' * 70}")
+
+    print(f"\n  ┌─ POSITIVE NO-INJECT (baseline) ────────────────")
+    for cat in CATEGORIES:
+        pct = counts_pos_no_inject[cat] / total_pos_no_inject * 100 if total_pos_no_inject > 0 else 0
+        print(f"  │  {cat:25s}: {counts_pos_no_inject[cat]:3d}  ({pct:5.1f}%)")
+    print(f"  └─── total: {total_pos_no_inject}")
 
     print(f"\n  ┌─ POSITIVE (injected) ────────────────────────")
     for cat in CATEGORIES:
