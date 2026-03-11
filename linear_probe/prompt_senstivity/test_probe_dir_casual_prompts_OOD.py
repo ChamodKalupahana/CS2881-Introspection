@@ -249,6 +249,8 @@ def main():
     parser.add_argument("--token_type", type=str, default="last_token",
                         choices=["last_token", "prompt_last_token"],
                         help="Which token type vector to load (default: last_token)")
+    parser.add_argument("--pca_index", type=int, default=None,
+                        help="If probe_path is a .pt dict containing PCA components, specify which index to use (0-indexed)")
     args = parser.parse_args()
 
     # Resolve which prompts to run
@@ -280,7 +282,18 @@ def main():
         probe_path = script_dir / "probe_vectors" / f"mass_mean_vector_layer{args.probe_layer}_{args.token_type}.pt"
 
     print(f"\n📐 Loading probe vector from: {probe_path}")
-    probe_vector = torch.load(probe_path, map_location="cpu")
+    loaded_probe = torch.load(probe_path, map_location="cpu", weights_only=False)
+    
+    # If the loaded object is a dict and pca_index is provided, extract the specified PC component
+    if isinstance(loaded_probe, dict) and "components" in loaded_probe and args.pca_index is not None:
+        print(f"   Extracting PCA component index {args.pca_index} (PC{args.pca_index + 1})")
+        probe_vector = loaded_probe["components"][args.pca_index]
+    else:
+        probe_vector = loaded_probe
+
+    if not isinstance(probe_vector, torch.Tensor):
+        probe_vector = torch.tensor(probe_vector, dtype=torch.float32)
+
     print(f"   Shape: {probe_vector.shape}")
 
     # ── Load model ───────────────────────────────────────────────────────
