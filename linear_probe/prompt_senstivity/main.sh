@@ -30,3 +30,5 @@ python compute_PCA.py --input_vector saved_activations/prompt_activations_03_10_
 
 # validate pca dir after analysuing compute_PCA.py plots
 python validate_vector.py --input_vector saved_activations/prompt_activations_03_10_26_19_27/pca_components/last_token_layer_21_pca.pt --pca_index 2 --layer 21 --prompts 0
+
+python compute_PCA.py --input_vector saved_activations/prompt_activations_03_10_26_19_27/postive_no_inject/not_detected/baseline_p0_layers16-31_noinject.pt --max_components 28 --plot_mean_diff --max_layer 25

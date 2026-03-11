@@ -47,10 +47,10 @@ def main():
                         help="Maximum layer to plot (inclusive)")
     parser.add_argument("--plot_pc1", action="store_true", 
                         help="Plot Explained Variance of PC1 as a line graph instead of the 2D heatmap")
-    parser.add_argument("--plot_mean_diff", action="store_true", 
-                        help="Plot mean(calibration_correct) - mean(detected_correct) projected onto PCA")
+    parser.add_argument("--plot_cohens_d", action="store_true", 
+                        help="Plot Cohen's d between calibration_correct and detected_correct projected onto PCA")
     parser.add_argument("--plot_mean_diff_dot_product", action="store_true", 
-                        help="Plot scalar multiplication of projections: (calibration_correct - pos_correct) * (not_detected - pos_correct)")
+                        help="Plot scalar multiplication of projections: Cohen's d * (not_detected - pos_correct)")
     parser.add_argument("--input_vector", type=str, default=None,
                         help="Path to an activation .pt file to compute dot product against PCA components")
     args = parser.parse_args()
@@ -119,8 +119,8 @@ def main():
     variance_matrix = []
     pc1_values = []
     input_dots_matrix = []
-    notdet_diff_matrix = []
-    mean_diff_matrix = []
+    notdet_cohens_d_matrix = []
+    cohens_d_matrix = []
     mean_diff_dot_product_matrix = []
 
     print(f"\nProcessing layers...")
@@ -229,42 +229,92 @@ def main():
                 input_dots_matrix.append(dots_array)
 
             # Store difference in means for not_detected vs pos_correct
+            notdet_cohens_d_signed = None
             if notdet_vecs and pos_all_vecs:
-                mean_notdet = torch.stack(notdet_vecs).mean(dim=0)
-                mean_pos_all = torch.stack(pos_all_vecs).mean(dim=0)
-                mean_diff = mean_notdet - mean_pos_all
-                diff_proj = torch.matmul(Vh, mean_diff).numpy()
+                notdet_tensor = torch.stack(notdet_vecs)
+                pos_tensor = torch.stack(pos_all_vecs)
                 
-                if len(diff_proj) > args.max_components:
-                    diff_proj = diff_proj[:args.max_components]
-                elif len(diff_proj) < args.max_components:
-                    diff_proj = np.pad(diff_proj, (0, args.max_components - len(diff_proj)), 'constant')
-                notdet_diff_matrix.append(diff_proj)
+                Vh_f = Vh.to(notdet_tensor.dtype)
+                
+                notdet_proj = torch.matmul(notdet_tensor, Vh_f.T)
+                pos_proj = torch.matmul(pos_tensor, Vh_f.T)
+                
+                n1 = notdet_proj.shape[0]
+                n2 = pos_proj.shape[0]
+                
+                mu1 = notdet_proj.mean(dim=0).numpy()
+                mu2 = pos_proj.mean(dim=0).numpy()
+                
+                s1_sq = notdet_proj.var(dim=0, unbiased=True).numpy()
+                s2_sq = pos_proj.var(dim=0, unbiased=True).numpy()
+                
+                s_pooled = np.sqrt(((n1 - 1) * s1_sq + (n2 - 1) * s2_sq) / (n1 + n2 - 2))
+                s_pooled[s_pooled == 0] = 1e-8
+                
+                notdet_cohens_d = np.abs(mu1 - mu2) / s_pooled
+                notdet_cohens_d_signed = (mu1 - mu2) / s_pooled
+                
+                if len(notdet_cohens_d) > args.max_components:
+                    notdet_cohens_d = notdet_cohens_d[:args.max_components]
+                    notdet_cohens_d_signed = notdet_cohens_d_signed[:args.max_components]
+                elif len(notdet_cohens_d) < args.max_components:
+                    notdet_cohens_d = np.pad(notdet_cohens_d, (0, args.max_components - len(notdet_cohens_d)), 'constant')
+                    notdet_cohens_d_signed = np.pad(notdet_cohens_d_signed, (0, args.max_components - len(notdet_cohens_d_signed)), 'constant')
+                    
+                notdet_cohens_d_matrix.append(notdet_cohens_d)
             else:
-                notdet_diff_matrix.append(np.zeros(args.max_components))
+                notdet_cohens_d_matrix.append(np.zeros(args.max_components))
 
-            # Store difference in means for calibration_correct vs pos_correct
-            if args.plot_mean_diff or args.plot_mean_diff_dot_product:
+            # Compute Cohen's d for calibration_correct vs pos_correct
+            if args.plot_cohens_d or args.plot_mean_diff_dot_product:
                 if neg_all_vecs and pos_all_vecs:
-                    mean_neg_all = torch.stack(neg_all_vecs).mean(dim=0)
-                    mean_pos_all = torch.stack(pos_all_vecs).mean(dim=0)
-                    mean_diff_calib = mean_neg_all - mean_pos_all
-                    diff_proj_calib = torch.matmul(Vh, mean_diff_calib).numpy()
+                    neg_tensor = torch.stack(neg_all_vecs)
+                    pos_tensor = torch.stack(pos_all_vecs)
                     
-                    if len(diff_proj_calib) > args.max_components:
-                        diff_proj_calib = diff_proj_calib[:args.max_components]
-                    elif len(diff_proj_calib) < args.max_components:
-                        diff_proj_calib = np.pad(diff_proj_calib, (0, args.max_components - len(diff_proj_calib)), 'constant')
+                    # Project both populations onto the PCA components (Vh is [n_components, hidden_size])
+                    # Ensure Vh has same dtype
+                    Vh_f = Vh.to(neg_tensor.dtype)
                     
-                    if args.plot_mean_diff:
-                        mean_diff_matrix.append(diff_proj_calib)
+                    neg_proj = torch.matmul(neg_tensor, Vh_f.T) # [n1, n_components]
+                    pos_proj = torch.matmul(pos_tensor, Vh_f.T) # [n2, n_components]
                     
-                    if args.plot_mean_diff_dot_product and notdet_vecs:
+                    n1 = neg_proj.shape[0]
+                    n2 = pos_proj.shape[0]
+                    
+                    mu1 = neg_proj.mean(dim=0).numpy()
+                    mu2 = pos_proj.mean(dim=0).numpy()
+                    
+                    # Unbiased sample variances (ddof=1)
+                    s1_sq = neg_proj.var(dim=0, unbiased=True).numpy()
+                    s2_sq = pos_proj.var(dim=0, unbiased=True).numpy()
+                    
+                    # Pooled standard deviation
+                    s_pooled = np.sqrt(((n1 - 1) * s1_sq + (n2 - 1) * s2_sq) / (n1 + n2 - 2))
+                    
+                    # Avoid division by zero
+                    s_pooled[s_pooled == 0] = 1e-8
+                    
+                    # Cohen's d: |mu1 - mu2| / s_pooled
+                    # But we also need the raw non-absolute effect size for dot products if needed
+                    cohens_d = np.abs(mu1 - mu2) / s_pooled
+                    cohens_d_signed = (mu1 - mu2) / s_pooled
+                    
+                    if len(cohens_d) > args.max_components:
+                        cohens_d = cohens_d[:args.max_components]
+                        cohens_d_signed = cohens_d_signed[:args.max_components]
+                    elif len(cohens_d) < args.max_components:
+                        cohens_d = np.pad(cohens_d, (0, args.max_components - len(cohens_d)), 'constant')
+                        cohens_d_signed = np.pad(cohens_d_signed, (0, args.max_components - len(cohens_d_signed)), 'constant')
+                    
+                    if args.plot_cohens_d:
+                        cohens_d_matrix.append(cohens_d)
+                    
+                    if args.plot_mean_diff_dot_product and notdet_cohens_d_signed is not None:
                         # normalize before multiplication
-                        norm_calib = np.linalg.norm(diff_proj_calib)
-                        norm_notdet = np.linalg.norm(diff_proj)
-                        normed_calib = diff_proj_calib / norm_calib if norm_calib > 0 else diff_proj_calib
-                        normed_notdet = diff_proj / norm_notdet if norm_notdet > 0 else diff_proj
+                        norm_calib = np.linalg.norm(cohens_d_signed)
+                        norm_notdet = np.linalg.norm(notdet_cohens_d_signed)
+                        normed_calib = cohens_d_signed / norm_calib if norm_calib > 0 else cohens_d_signed
+                        normed_notdet = notdet_cohens_d_signed / norm_notdet if norm_notdet > 0 else notdet_cohens_d_signed
                         
                         # element-wise multiplication
                         mean_diff_dot_product_matrix.append(normed_calib * normed_notdet)
@@ -272,8 +322,8 @@ def main():
                         mean_diff_dot_product_matrix.append(np.zeros(args.max_components))
                         
                 else:
-                    if args.plot_mean_diff:
-                        mean_diff_matrix.append(np.zeros(args.max_components))
+                    if args.plot_cohens_d:
+                        cohens_d_matrix.append(np.zeros(args.max_components))
                     if args.plot_mean_diff_dot_product:
                         mean_diff_dot_product_matrix.append(np.zeros(args.max_components))
 
@@ -367,8 +417,8 @@ def main():
             print(f"Dot products heatmap saved to {dots_plot_path}")
 
         # Plot not_detected vs pos_correct diff heatmap
-        if notdet_diff_matrix:
-            diff_matrix_np = np.abs(np.array(notdet_diff_matrix))
+        if notdet_cohens_d_matrix:
+            diff_matrix_np = np.abs(np.array(notdet_cohens_d_matrix))
             plt.figure(figsize=(10, 8))
             
             vmax = np.max(diff_matrix_np)
@@ -381,42 +431,43 @@ def main():
             plt.yticks(ticks=np.arange(len(layers_plotted)), labels=layers_plotted)
             plt.xticks(ticks=xticks, labels=xlabels)
             
-            plt.colorbar(label='Absolute Dot Product (Mean Not Detected - Mean Pos Correct)')
+            plt.colorbar(label="Cohen's d (Not Detected vs Pos Correct)")
             
-            plt.title(f"Absolute Projection of (Not Detected - Pos Correct) onto PCA ({token_type})")
+            plt.title(f"Cohen's d of (Not Detected vs Pos Correct) onto PCA ({token_type})")
             plt.ylabel("Layer")
             plt.xlabel("PCA Component")
             
-            diff_filename = f"pca_notdet_diff_heatmap_{dir_suffix}.png"
+            diff_filename = f"pca_notdet_cohens_d_heatmap_{dir_suffix}.png"
             diff_plot_path = output_dir / diff_filename
             plt.savefig(diff_plot_path)
-            print(f"Not Detected diff heatmap saved to {diff_plot_path}")
+            print(f"Not Detected Cohen's d heatmap saved to {diff_plot_path}")
 
-        # Plot calibration_correct vs pos_correct diff heatmap
-        if args.plot_mean_diff and mean_diff_matrix:
-            mean_diff_np = np.abs(np.array(mean_diff_matrix))
+        # Plot Cohen's d heatmap
+        if args.plot_cohens_d and cohens_d_matrix:
+            cohens_d_np = np.array(cohens_d_matrix)
             plt.figure(figsize=(10, 8))
             
-            vmax = np.max(mean_diff_np)
+            # Use 'Reds' because Cohen's d is plotted as absolute value
+            vmax = np.max(cohens_d_np)
             if vmax == 0:
                 vmax = 1.0  # avoid division by zero in cmap if empty
                 
-            plt.imshow(mean_diff_np, aspect='auto', cmap='Reds', origin='lower', 
+            plt.imshow(cohens_d_np, aspect='auto', cmap='Reds', origin='lower', 
                        vmin=0, vmax=vmax)
             
             plt.yticks(ticks=np.arange(len(layers_plotted)), labels=layers_plotted)
             plt.xticks(ticks=xticks, labels=xlabels)
             
-            plt.colorbar(label='Absolute Dot Product (Mean Calibration - Mean Pos Correct)')
+            plt.colorbar(label="Cohen's d (Calibration vs Pos Correct)")
             
-            plt.title(f"Absolute Projection of (Calibration - Pos Correct) onto PCA ({token_type})")
+            plt.title(f"Cohen's d of (Calibration vs Pos Correct) onto PCA ({token_type})")
             plt.ylabel("Layer")
             plt.xlabel("PCA Component")
             
-            diff_filename2 = f"pca_mean_diff_heatmap_{dir_suffix}.png"
+            diff_filename2 = f"pca_cohens_d_heatmap_{dir_suffix}.png"
             diff_plot_path2 = output_dir / diff_filename2
             plt.savefig(diff_plot_path2)
-            print(f"Mean diff heatmap saved to {diff_plot_path2}")
+            print(f"Cohen's d heatmap saved to {diff_plot_path2}")
 
         # Plot dot product of the two difference vectors projected onto PCA
         if args.plot_mean_diff_dot_product and mean_diff_dot_product_matrix:
@@ -435,7 +486,7 @@ def main():
             
             plt.colorbar(label='Absolute Scalar Multiplication Value')
             
-            plt.title(f"Abs(Proj(Not Detected - Pos Correct) * Proj(Calibration - Pos Correct)) ({token_type})")
+            plt.title(f"Abs(Cohen's d (Not Detected - Pos) * Cohen's d (Calib - Pos)) ({token_type})")
             plt.ylabel("Layer")
             plt.xlabel("PCA Component")
             
