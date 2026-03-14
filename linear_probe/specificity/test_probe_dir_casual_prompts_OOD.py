@@ -74,8 +74,7 @@ def inject_and_steer(
     probe_vector, probe_layer,
     messages,
     coeff=10.0, alpha=0.0,
-    max_new_tokens=100, skip_inject=False,
-    continuous_steering=False,
+    max_new_tokens=100, skip_inject=False
 ):
     """
     Run inference with optional concept-vector injection AND optional
@@ -246,8 +245,6 @@ def main():
                         help="Only run clean (no-injection) for the first concept")
     parser.add_argument("--prompts", type=int, nargs="*", default=None,
                         help="Which OOD prompt indices to run (default: all)")
-    parser.add_argument("--continuous_steering", action="store_true",
-                        help="Add the probe vector to the entire sequence instead of just the last token")
     parser.add_argument("--token_type", type=str, default="last_token",
                         choices=["last_token", "prompt_last_token"],
                         help="Which token type vector to load (default: last_token)")
@@ -367,8 +364,7 @@ def main():
                                     messages,
                                     coeff=coeff, alpha=alpha,
                                     max_new_tokens=args.max_new_tokens,
-                                    skip_inject=False,
-                                    continuous_steering=args.continuous_steering,
+                                    skip_inject=False
                                 )
                             except Exception as e:
                                 print(f"    alpha={alpha:>6.1f} | ⚠ Error: {e}")
@@ -393,8 +389,7 @@ def main():
                                         messages,
                                         coeff=coeff, alpha=alpha,
                                         max_new_tokens=args.max_new_tokens,
-                                        skip_inject=True,
-                                        continuous_steering=args.continuous_steering,
+                                        skip_inject=True
                                     )
                                 except Exception as e:
                                     print(f"    alpha={alpha:>6.1f} | ⚠ Error: {e}")

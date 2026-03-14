@@ -179,6 +179,7 @@ def inject_and_steer(
     inputs = tokenizer(formatted_prompt, return_tensors="pt", add_special_tokens=False).to(device)
     prompt_length = inputs.input_ids.shape[1]
     prompt_processed = False
+    probe_prompt_processed = False
 
     # ── Concept injection hook (same logic as save_vectors_by_layer) ─────
     def injection_hook(module, input, output):
@@ -207,15 +208,38 @@ def inject_and_steer(
         modified = hidden_states + coeff * steer_expanded
         return (modified,) + output[1:] if isinstance(output, tuple) else modified
 
-    # ── Probe direction steering hook ────────────────────────────────────
+# ── UPDATED: Probe direction steering hook ───────────────────────────
     def probe_steering_hook(module, input, output):
+        nonlocal probe_prompt_processed
         hidden_states = output[0] if isinstance(output, tuple) else output
         probe = pv.to(device=hidden_states.device, dtype=hidden_states.dtype)
-        # Scale the last token position along the probe direction
-        hidden_states[:, -1, :] = hidden_states[:, -1, :] + alpha * probe
-        if isinstance(output, tuple):
-            return (hidden_states,) + output[1:]
-        return hidden_states
+        batch_size, seq_len, hidden_dim = hidden_states.shape
+        probe_expanded = torch.zeros_like(hidden_states)
+
+        if injection_start_token is not None:
+            # Check if we are in generation phase using the exact same logic
+            is_generating = (seq_len == 1 and probe_prompt_processed) or (seq_len > prompt_length)
+            if seq_len == prompt_length:
+                probe_prompt_processed = True
+            
+            if is_generating:
+                # Generation phase: apply to the newly generated token
+                probe_expanded[:, -1:, :] = probe
+            else:
+                # Prefill phase: apply to all tokens starting from injection_start_token
+                start_idx = max(0, injection_start_token)
+                if start_idx < seq_len:
+                    probe_expanded[:, start_idx:, :] = probe.expand(
+                        batch_size, seq_len - start_idx, -1
+                    )
+        else:
+            # Fallback if no start token was found
+            if seq_len == 1:
+                probe_expanded[:, :, :] = probe
+
+        # Apply the scaled probe vector across the expanded token mask
+        modified = hidden_states + alpha * probe_expanded
+        return (modified,) + output[1:] if isinstance(output, tuple) else modified
 
     # ── Register hooks & generate ────────────────────────────────────────
     handles = []
