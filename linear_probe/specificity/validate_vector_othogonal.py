@@ -202,12 +202,6 @@ def main():
                         label=f'Detected Opposite (n={len(opp_scores)})',
                         alpha=0.7, edgecolors='w', s=s, marker='X')
 
-        if len(ortho_scores) > 0:
-            jitter_ortho = np.random.uniform(-0.1, 0.1, size=len(ortho_scores))
-            plt.scatter(ortho_scores, jitter_ortho, color='orange',
-                        label=f'Detected Orthogonal (n={len(ortho_scores)})',
-                        alpha=0.7, edgecolors='w', s=s, marker='o')
-
         if len(para_scores) > 0:
             jitter_para = np.random.uniform(-0.1, 0.1, size=len(para_scores))
             plt.scatter(para_scores, jitter_para, color='cyan',
