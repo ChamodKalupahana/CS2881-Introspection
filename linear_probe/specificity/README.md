@@ -27,7 +27,7 @@ This is the primary script for running concept injection experiments and capturi
 
 ```bash
 # Run specificity test for a specific layer and coefficient
-python3 linear_probe/specificity/save_vectors_orthogonal.py --layers 18 --coeffs 10 --datasets simple_data
+python3 linear_probe/specificity/save_vectors_orthogonal.py --layers 16 --coeffs 8.0 --datasets simple_data
 ```
 
 ### Arguments:

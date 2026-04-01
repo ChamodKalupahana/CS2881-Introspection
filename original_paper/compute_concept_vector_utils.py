@@ -17,13 +17,13 @@ def get_model_type(tokenizer):
 
 def format_prompt(model_type, user_message, dataset_name=None):
     """Format prompt based on model type"""
-    if model_type == "qwen":
-        if dataset_name and dataset_name.startswith("simple_data"):
+    if "qwen" in model_type:
+        if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset"):
             return f"<|im_start|>user\nTell me about {user_message}.<|im_end|>\n<|im_start|>assistant\n"
         else:
             return f"<|im_start|>user\n{user_message}<|im_end|>\n<|im_start|>assistant\n"
     else:  # llama
-        if dataset_name and dataset_name.startswith("simple_data"):
+        if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset"):
             return f"<|start_header_id|>user<|end_header_id|>Tell me about {user_message}.<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
         else:
             return f"<|start_header_id|>user<|end_header_id|>{user_message}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
@@ -35,7 +35,7 @@ def get_data(dataset_name):
     # Dataset is in the project root, which is one level up from original_paper
     dataset_dir = script_dir.parent / "dataset"
     
-    if dataset_name and dataset_name.startswith("simple_data"):
+    if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset"):
         clean_name = dataset_name if dataset_name.endswith(".json") else f"{dataset_name}.json"
         with open(dataset_dir / clean_name, "r") as f:
             data = json.load(f)
@@ -97,14 +97,15 @@ def compute_concept_vector(model, tokenizer, dataset_name, layer_idx):
     data = get_data(dataset_name)
     steering_vectors = {}
     
-    if dataset_name and dataset_name.startswith("simple_data"):
+    if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset"):
         concept_words = data["concept_vector_words"]
         
-        # Use only 50 for the original simple_data string to preserve original behavior, but all for expanded datasets
-        if "expanded" not in dataset_name:
-            baseline_words = data["baseline_words"][:50]
-        else:
+        # Use only 50 for the original simple_data string to preserve original behavior, 
+        # but all for expanded datasets or the new abstract nouns dataset
+        if "expanded" in dataset_name or "abstract" in dataset_name:
             baseline_words = data["baseline_words"]
+        else:
+            baseline_words = data["baseline_words"][:50]
         
         # Compute baseline means once (used for all concepts)
         print(f"Computing baseline mean from {len(baseline_words)} words...")
