@@ -17,7 +17,7 @@ from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-def load_class_vectors(root_dir, layer, coeff):
+def load_class_vectors(root_dir, layer, coeff, vec_type='last_token'):
     """Load all activation vectors for a given layer from flat concept files."""
     vectors = []
     concepts = []
@@ -42,14 +42,19 @@ def load_class_vectors(root_dir, layer, coeff):
                 continue
                 
         try:
-            concept = torch.load(f, map_location="cpu", weights_only=False).get('concept', f.name.split('_')[0])
-            acts = torch.load(f, map_location="cpu", weights_only=False)['activations']
+            data = torch.load(f, map_location="cpu", weights_only=False)
+            concept = data.get('concept', f.name.split('_')[0])
+            acts = data['activations']
             
             # Handle multi-layer dictionary format vs legacy single-layer point format
             if layer in acts:
-                vec = acts[layer]['last_token']
-            elif 'last_token' in acts:
-                vec = acts['last_token']
+                layer_acts = acts[layer]
+                if vec_type in layer_acts:
+                    vec = layer_acts[vec_type]
+                else:
+                    continue
+            elif vec_type in acts:
+                vec = acts[vec_type]
             else:
                 continue
                 
@@ -80,6 +85,9 @@ def main():
                         help="Consider detected_parallel as detected_correct for the mass-mean vector and plot")
     parser.add_argument("--hide_intermediate", action="store_true",
                         help="Only plot the detected_correct and not_detected classes, hiding opposite, orthogonal, and parallel.")
+    parser.add_argument("--vec-type", type=str, default="last_token",
+                        choices=["last_token", "prompt_last_token", "prompt_mean", "generation_mean"],
+                        help="Vector type to load from activations (default: last_token)")
     args = parser.parse_args()
 
     layer = args.layer
@@ -87,21 +95,21 @@ def main():
     injected_dir = Path(args.injected_dir) if args.injected_dir else script_dir / "injected_correct"
     clean_dir = Path(args.clean_dir) if args.clean_dir else script_dir / "not_detected"
 
-    print(f"Loading data for Layer {layer}...")
+    print(f"Loading data for Layer {layer} (Type: {args.vec_type})...")
     print(f"  Positive (detected):     {injected_dir}")
     print(f"  Negative (not detected): {clean_dir}")
 
     # Load each class independently (concepts are mutually exclusive)
-    pos_vecs, pos_concepts = load_class_vectors(injected_dir, layer, coeff)
-    neg_vecs, neg_concepts = load_class_vectors(clean_dir, layer, coeff)
-
+    pos_vecs, pos_concepts = load_class_vectors(injected_dir, layer, coeff, args.vec_type)
+    neg_vecs, neg_concepts = load_class_vectors(clean_dir, layer, coeff, args.vec_type)
+    
     # Automatically derive the parent split dir
     parent_dir = injected_dir.parent
     
     # Try to load extra classes for plotting on the same vector axis
-    opp_vecs, opp_concepts = load_class_vectors(parent_dir / "detected_opposite", layer, coeff)
-    ortho_vecs, ortho_concepts = load_class_vectors(parent_dir / "detected_orthogonal", layer, coeff)
-    para_vecs, para_concepts = load_class_vectors(parent_dir / "detected_parallel", layer, coeff)
+    opp_vecs, opp_concepts = load_class_vectors(parent_dir / "detected_opposite", layer, coeff, args.vec_type)
+    ortho_vecs, ortho_concepts = load_class_vectors(parent_dir / "detected_orthogonal", layer, coeff, args.vec_type)
+    para_vecs, para_concepts = load_class_vectors(parent_dir / "detected_parallel", layer, coeff, args.vec_type)
 
     if args.merge_parallel:
         print("  [Note] Merging detected_parallel into detected_correct class.")

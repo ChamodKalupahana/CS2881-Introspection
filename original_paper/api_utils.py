@@ -2,7 +2,7 @@ import os
 from typing import Optional
 from dotenv import load_dotenv
 from openai import OpenAI
-from original_paper.all_prompts import coherence_prompt, thinking_about_word_prompt, affirmative_response_prompt, affirmative_response_followed_by_correct_identification_prompt, mcq_correct_prompt, injection_strength_correct_prompt
+from original_paper.all_prompts import coherence_prompt, thinking_about_word_prompt, affirmative_response_prompt, affirmative_response_followed_by_correct_identification_prompt, mcq_correct_prompt, injection_strength_correct_prompt, internality_prompt
 
 load_dotenv()
 
@@ -26,6 +26,8 @@ def query_llm_judge(question = None, response = None, word = None, grading_type 
         prompt = mcq_correct_prompt.format(options_text=options_text, correct_letter=correct_letter, response=response)
     elif grading_type == "injection_strength_correct":
         prompt = injection_strength_correct_prompt.format(expected_category=expected_category, response=response)
+    elif grading_type == "internality":
+        prompt = internality_prompt.format(target_concept=word, model_response=response)
     try: 
         completion = client.chat.completions.create(
             model="gpt-4.1-nano",

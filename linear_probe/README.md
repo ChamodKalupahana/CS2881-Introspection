@@ -56,3 +56,8 @@ python DLA_towards_probe_dir.py --activation_file saved_activations/run_03_01_26
 python DLA_towards_probe_dir.py --activation_dir saved_activations/run_03_01_26_17_00/detected_correct --probe_file probe_vectors/mass_mean_vector_layer19.pt
 
 python test_probe_dir_casual_OOD.py --layers 16 --coeffs 8.0 --datasets test_data --alphas -8 -5 -2 0 2 5 8 16 24 --probe_layer 19 --clean_once --probe_path probe_vectors/mass_mean_vector_layer19.pt
+
+### final experiment run with abstract nouns
+python save_vectors_not_detected.py --layers 16 --coeffs 8.0 --datasets abstract_nouns_dataset --capture_all_layers
+
+python compute_mass_mean_vector.py --layer 19 --injected-dir saved_activations/run_04_01_26_22_51/detected_correct --clean-dir saved_activations/run_04_01_26_22_51/not_detected

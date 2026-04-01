@@ -109,6 +109,15 @@ def classify_response(response: str, concept: str) -> str:
     if not affirm:
         return "not_detected"
 
+    # Step 1.5: Internality check (did it detect BEFORE manifestation?)
+    internality = query_llm_judge(
+        response=response, word=concept,
+        grading_type="internality",
+    )
+    if not internality:
+        print(f"  [internality] Model failed internality rule (likely late realization) → not_detected")
+        return "not_detected"
+
     # Step 2: Detailed classification
     try:
         prompt = CLASSIFICATION_PROMPT.format(concept=concept, response=response)
