@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 import torch
 from tqdm import tqdm
+import einops
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
@@ -32,7 +33,7 @@ def compute_vector_all_layers(model, tokenizer, dataset_name, steering_prompt, m
     prompt_len = len(tokenizer.encode(prompt, add_special_tokens=False))
     
     num_layers = model.config.num_hidden_layers
-    layers_to_save = list(range(min_layer_to_save + 1, num_layers))
+    layers_to_save = list(range(min_layer_to_save, num_layers + 1))
     
     with torch.no_grad():
         outputs = model(**inputs, output_hidden_states=True) # [batch_size, seq_len, hidden_dim]
@@ -81,7 +82,7 @@ def compute_complex_concept_vector(model, tokenizer, dataset_name, concept_name 
         print(f"\nProcessing {concept_name}: {len(pos_sentences)} pos, {len(neg_sentences)} neg")
         
         num_layers = model.config.num_hidden_layers
-        layers_to_save = list(range(min_layer_to_save + 1, num_layers))
+        layers_to_save = list(range(min_layer_to_save, num_layers + 1))
         
         pos_vecs_avg = {l: [] for l in layers_to_save}
         for sentence in tqdm(pos_sentences, desc=f"{concept_name} (positive)"):
@@ -94,7 +95,7 @@ def compute_complex_concept_vector(model, tokenizer, dataset_name, concept_name 
             _, avg_vecs = compute_vector_all_layers(model, tokenizer, dataset_name, sentence, min_layer_to_save)
             for l in layers_to_save:
                 neg_vecs_avg[l].append(avg_vecs[l])
-        
+                
         # Store the distribution (all instances) for the average variants per layer
         for l in layers_to_save:
             positive_avg[l] = torch.stack(pos_vecs_avg[l], dim=0).squeeze()
