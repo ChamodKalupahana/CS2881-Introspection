@@ -71,7 +71,5 @@ def main():
 
     # compute PCA and cohen's d
 
-
-
 if __name__ == "__main__":
     main()

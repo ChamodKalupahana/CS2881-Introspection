@@ -1,5 +1,17 @@
+import torch
+import sys
+from pathlib import Path
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
+from original_paper.all_prompts import get_anthropic_reproduce_messages
+
 # ── Injection + activation capture ───────────────────────────────────────────
 
+# for just concept vector
 def inject_and_capture_activations(
     model, tokenizer, steering_vector, layer_to_inject, capture_layers,
     coeff=10.0, max_new_tokens=100, skip_inject=False,
@@ -138,3 +150,147 @@ def inject_and_capture_activations(
         activations = _package(captured_per_layer[capture_layers[0]])
 
     return response, activations
+
+
+# ── Steering helpers for testing and evaluation ──────────────────────────────────────────────────────────
+
+def inject_and_steer_concept_and_probe(
+    model, tokenizer, concept_vector, layer_to_inject,
+    probe_vector, probe_layer,
+    messages,
+    coeff=10.0, alpha=0.0,
+    max_new_tokens=200, skip_inject=False
+):
+    """
+    Run inference with optional concept-vector injection AND optional
+    probe-direction scaling, using the given messages as the prompt.
+
+    Returns:
+        (response_text, messages) — the generated text and the messages used.
+    """
+    device = next(model.parameters()).device
+
+    # ── Normalised concept vector ────────────────────────────────────────
+    sv = concept_vector / torch.norm(concept_vector, p=2)
+    if not isinstance(sv, torch.Tensor):
+        sv = torch.tensor(sv, dtype=torch.float32)
+    sv = sv.to(device)
+    if sv.dim() == 1:
+        sv = sv.unsqueeze(0).unsqueeze(0)
+    elif sv.dim() == 2:
+        sv = sv.unsqueeze(0)
+
+    # ── Normalised probe vector ──────────────────────────────────────────
+    pv = probe_vector.clone().float()
+    pv = pv / torch.norm(pv, p=2)
+    pv = pv.to(device)
+
+    # ── Build prompt from messages ───────────────────────────────────────
+    formatted_prompt = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+
+    # Find injection start — use the user content position
+    user_content = messages[-1]["content"]
+    user_pos = formatted_prompt.find(user_content)
+    if user_pos != -1:
+        prefix = formatted_prompt[:user_pos]
+        injection_start_token = len(tokenizer.encode(prefix, add_special_tokens=False))
+    else:
+        injection_start_token = None
+
+    inputs = tokenizer(formatted_prompt, return_tensors="pt", add_special_tokens=False).to(device)
+    prompt_length = inputs.input_ids.shape[1]
+    prompt_processed = False
+    probe_prompt_processed = False
+
+    # ── Concept injection hook ───────────────────────────────────────────
+    def injection_hook(module, input, output):
+        nonlocal prompt_processed
+        hidden_states = output[0] if isinstance(output, tuple) else output
+        steer = sv.to(device=hidden_states.device, dtype=hidden_states.dtype)
+        batch_size, seq_len, hidden_dim = hidden_states.shape
+        steer_expanded = torch.zeros_like(hidden_states)
+
+        if injection_start_token is not None:
+            is_generating = (seq_len == 1 and prompt_processed) or (seq_len > prompt_length)
+            if seq_len == prompt_length:
+                prompt_processed = True
+            if is_generating:
+                steer_expanded[:, -1:, :] = steer
+            else:
+                start_idx = max(0, injection_start_token)
+                if start_idx < seq_len:
+                    steer_expanded[:, start_idx:, :] = steer.expand(
+                        batch_size, seq_len - start_idx, -1
+                    )
+        else:
+            if seq_len == 1:
+                steer_expanded[:, :, :] = steer
+
+        modified = hidden_states + coeff * steer_expanded
+        return (modified,) + output[1:] if isinstance(output, tuple) else modified
+
+# ── UPDATED: Probe direction steering hook ───────────────────────────
+    def probe_steering_hook(module, input, output):
+        nonlocal probe_prompt_processed
+        hidden_states = output[0] if isinstance(output, tuple) else output
+        probe = pv.to(device=hidden_states.device, dtype=hidden_states.dtype)
+        batch_size, seq_len, hidden_dim = hidden_states.shape
+        probe_expanded = torch.zeros_like(hidden_states)
+
+        if injection_start_token is not None:
+            # Check if we are in generation phase using the exact same logic
+            is_generating = (seq_len == 1 and probe_prompt_processed) or (seq_len > prompt_length)
+            if seq_len == prompt_length:
+                probe_prompt_processed = True
+            
+            if is_generating:
+                # Generation phase: apply to the newly generated token
+                probe_expanded[:, -1:, :] = probe
+            else:
+                # Prefill phase: apply to all tokens starting from injection_start_token
+                start_idx = max(0, injection_start_token)
+                if start_idx < seq_len:
+                    probe_expanded[:, start_idx:, :] = probe.expand(
+                        batch_size, seq_len - start_idx, -1
+                    )
+        else:
+            # Fallback if no start token was found
+            if seq_len == 1:
+                probe_expanded[:, :, :] = probe
+
+        # Apply the scaled probe vector across the expanded token mask
+        modified = hidden_states + alpha * probe_expanded
+        return (modified,) + output[1:] if isinstance(output, tuple) else modified
+
+    # ── Register hooks & generate ────────────────────────────────────────
+    handles = []
+    if not skip_inject:
+        handles.append(
+            model.model.layers[layer_to_inject].register_forward_hook(injection_hook)
+        )
+    if alpha != 0.0:
+        handles.append(
+            model.model.layers[probe_layer].register_forward_hook(probe_steering_hook)
+        )
+
+    try:
+        eos_id = tokenizer.eos_token_id
+        if isinstance(eos_id, list):
+            eos_id = eos_id[0]
+
+        with torch.no_grad():
+            out = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                pad_token_id=eos_id,
+            )
+        generated_ids = out[0][prompt_length:]
+        response = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+    finally:
+        for h in handles:
+            h.remove()
+
+    return response, messages
