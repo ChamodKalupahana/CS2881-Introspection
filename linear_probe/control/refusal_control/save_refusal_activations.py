@@ -67,7 +67,7 @@ def main():
                 tokenizer, 
                 instruction, 
                 min_layer_to_save=args.min_layer,
-                position=-5 
+                position=-6
             )
             
             for layer, act in current_activations.items():
