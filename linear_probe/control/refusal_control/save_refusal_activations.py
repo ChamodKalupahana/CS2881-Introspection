@@ -102,9 +102,10 @@ def main():
     # ── Persistence ────────────────────────────────────────────────────────
     timestamp = datetime.now().strftime("%m_%d_%H_%M")
     
-    # Save to project root directories for consistency
-    PROBE_RUN_DIR = PROJECT_ROOT / "probe_vectors" / "refusal" / f"run_{timestamp}"
-    ACT_RUN_DIR = PROJECT_ROOT / "saved_activations" / "refusal" / f"run_{timestamp}"
+    # Save to local directories relative to this script
+    current_dir = Path(__file__).resolve().parent
+    PROBE_RUN_DIR = current_dir / "probe_vectors" / "refusal" / f"run_{timestamp}"
+    ACT_RUN_DIR = current_dir / "saved_activations" / f"run_{timestamp}"
     
     PROBE_RUN_DIR.mkdir(parents=True, exist_ok=True)
     ACT_RUN_DIR.mkdir(parents=True, exist_ok=True)

@@ -1,19 +1,16 @@
 #!/bin/bash
 
+# no diff between 200 and 100 prompts for results
+NUM_PROMPTS=100
 # 1. Extract and Save Refusal Activations and Probes
 # This will save files to PROJECT_ROOT/probe_vectors/refusal/run_MM_DD_HH_MM
-python save_refusal_activations.py --num_prompts 100
+python save_refusal_activations.py --num_prompts $NUM_PROMPTS
 
 # 2. Get the latest run folder
 # We check the central probe_vectors/refusal directory (relative to project root)
 # From this folder, project root is ../../../
 # Update: Using the local probe_vectors since previous runs were stored there.
 LATEST_RUN=$(ls -td probe_vectors/refusal/run_*/ | head -n 1)
-
-if [ -z "$LATEST_RUN" ]; then
-    # Fallback to project root directory
-    LATEST_RUN=$(ls -td ../../../probe_vectors/refusal/run_*/ | head -n 1)
-fi
 
 echo "🚀 Comparing latest run: $LATEST_RUN"
 

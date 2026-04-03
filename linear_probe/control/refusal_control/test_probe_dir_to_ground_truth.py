@@ -68,13 +68,16 @@ def main():
     ground_truth_np = ground_truth.numpy().reshape(1, -1)
 
     # 3. Smart Discovery and Loading of Activations
-    # Expected structure: saved_activations/refusal/run_XX_YY_HH_MM
+    # Expected structure: linear_probe/control/refusal_control/saved_activations/run_XX_YY_HH_MM
     run_folder_name = folder.name # e.g. run_04_03_19_46
-    activations_run_dir = PROJECT_ROOT / "saved_activations" / "refusal" / run_folder_name
+    
+    # Try local search first (relative to this script)
+    current_script_dir = Path(__file__).resolve().parent
+    activations_run_dir = current_script_dir / "saved_activations" / run_folder_name
     
     if not activations_run_dir.exists():
-        # Fallback to local search if project-root-relative path fails
-        activations_run_dir = Path("saved_activations") / run_folder_name
+        # Fallback to absolute project-root-relative path
+        activations_run_dir = PROJECT_ROOT / "linear_probe" / "control" / "refusal_control" / "saved_activations" / run_folder_name
         
     print(f"📦 Loading activations from: {activations_run_dir}")
     if not activations_run_dir.exists():
@@ -118,7 +121,7 @@ def main():
                 'layer': layer,
                 'cos_sim': cos_sim_gt,
                 'd_score': d_score,
-                'label': f"MM L{layer} "
+                'label': f"L{layer} "
             })
             
         # B. PCA components comparison
@@ -193,8 +196,7 @@ def main():
                 textcoords="offset points", 
                 xytext=(0, 10), 
                 ha='center', 
-                fontsize=8,
-                bbox=dict(boxstyle='round,pad=0.2', fc='yellow', alpha=0.3) if is_mmv else None
+                fontsize=8
             )
 
     plt.title(f"Probe Discriminability (Cohen's d) vs Alignment (Refusal)")
