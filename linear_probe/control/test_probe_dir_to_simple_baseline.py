@@ -105,7 +105,7 @@ def main():
                 'layer': layer,
                 'cos_sim': cos_sim,
                 'dist': dist,
-                'label': f"MMV L{layer}"
+                'label': f"L{layer}"
             })
             
         # B. PCA components comparison
@@ -149,10 +149,11 @@ def main():
             c='red', alpha=0.6, s=100, label='PCA Components', marker='D'
         )
 
-    # Label points
+    # Label points (only those above threshold of interest)
     for r in results:
-        plt.annotate(r['label'], (r['dist'], r['cos_sim']), 
-                     textcoords="offset points", xytext=(0,10), ha='center', fontsize=8)
+        if r['dist'] > 6 or abs(r['cos_sim']) > 0.15:
+            plt.annotate(r['label'], (r['dist'], r['cos_sim']), 
+                         textcoords="offset points", xytext=(0,10), ha='center', fontsize=8)
 
     plt.title(f"Probe vs Baseline Comparison ({args.concept_word})")
     plt.xlabel("Euclidean Distance (L2 norm)")
