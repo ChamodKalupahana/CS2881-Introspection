@@ -152,7 +152,7 @@ def main():
     # Label points (only those above threshold of interest)
     for r in results:
         if r['dist'] > 6 or abs(r['cos_sim']) > 0.15:
-            # TODO: always plot MMV
+            # TODO: always plot MMV label
             # TODO: plot layer by colour and PCA componenet by num. inside box
             plt.annotate(r['label'], (r['dist'], r['cos_sim']), 
                          textcoords="offset points", xytext=(0,10), ha='center', fontsize=8)
