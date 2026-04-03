@@ -113,16 +113,14 @@ def extract_PCA_from_activations_cohens_d(positive_data: dict, negative_data: di
         
         # PCA on concatenated data
         X = np.concatenate([pos_dist, neg_dist], axis=0)
-        n_samples = X.shape[0]
-        actual_num_components = min(num_components, n_samples)
         
-        pca = PCA(n_components=actual_num_components)
+        pca = PCA(n_components=num_components)
         pca.fit(X)
         
         layer_diffs = []
         top_probes_for_layer = []
         
-        for comp_idx in range(actual_num_components):
+        for comp_idx in range(num_components):
             component = pca.components_[comp_idx]
             
             # Project ALL points onto the component to get distributions of projected values
