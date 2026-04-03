@@ -106,7 +106,7 @@ dataset = {
 }
 
 # Save to JSON
-output_path = os.path.join(os.path.dirname(__file__), 'expanded_abstract_nouns_dataset.json')
+output_path = os.path.join(os.path.dirname(__file__), 'abstract_nouns_dataset.json')
 with open(output_path, 'w') as f:
     json.dump(dataset, f, indent=4)
 
