@@ -86,8 +86,8 @@ print(f"Total baseline nouns found: {len(baseline_list)}")
 
 # Select the requested counts
 # Using a slice from the middle to avoid obscure start-of-alphabet words
-concept_count = 300
-baseline_count = 2000
+concept_count = 4500
+baseline_count = 20000
 
 # Skip first 100 to avoid some common but potentially less "abstract" A words
 concept_vector_final = concept_vector_list[100:100+concept_count] if len(concept_vector_list) >= 100+concept_count else concept_vector_list[:concept_count]
@@ -106,7 +106,7 @@ dataset = {
 }
 
 # Save to JSON
-output_path = os.path.join(os.path.dirname(__file__), 'abstract_nouns_dataset.json')
+output_path = os.path.join(os.path.dirname(__file__), 'expanded_abstract_nouns_dataset.json')
 with open(output_path, 'w') as f:
     json.dump(dataset, f, indent=4)
 
