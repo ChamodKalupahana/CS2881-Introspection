@@ -51,10 +51,10 @@ def extract_PCA_from_activations(positive_avg: dict, negative_avg: dict, num_com
         for comp_idx in range(num_components):
             component = pca.components_[comp_idx]
             
-            # Project means onto the component (dot product)
-            p_proj = np.dot(p_mean, component)
-            n_proj = np.dot(n_mean, component)
-            
+            # Project means onto the component (normalised dot product)
+            p_proj = np.dot(p_mean, component) / np.linalg.norm(p_mean)
+            n_proj = np.dot(n_mean, component) / np.linalg.norm(n_mean)
+
             # Discriminability score: absolute difference in projected means
             diff = abs(p_proj - n_proj)
             layer_diffs.append(diff)

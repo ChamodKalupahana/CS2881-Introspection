@@ -19,12 +19,10 @@ if [ -z "$LATEST_RUN_DIR" ]; then
     exit 1
 fi
 
-PROBE_FILE="${LATEST_RUN_DIR}mass_mass_vector_${CONCEPT}.pt"
-
-echo "🎯 Using latest probe path: $PROBE_FILE"
+echo "🎯 Using latest probes folder: $LATEST_RUN_DIR"
 
 # 3. Run the baseline comparison script
 python test_probe_dir_to_simple_baseline.py \
-    --probe_path "$PROBE_FILE" \
+    --probes_folder_path "$LATEST_RUN_DIR" \
     --concept_word "$CONCEPT" \
     --min_layer_to_save "$MIN_LAYER"
