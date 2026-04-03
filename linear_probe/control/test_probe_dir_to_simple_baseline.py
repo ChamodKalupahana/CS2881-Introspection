@@ -32,7 +32,7 @@ def main():
                         help="The word to compute the baseline steering vector for (e.g. Magnetism).")
     parser.add_argument("--vec_type", type=str, default="avg", choices=["avg", "last"],
                         help="Choose 'avg' (average activation) or 'last' (last token activation).")
-    parser.add_argument("--save_dir", type=str, default="plots",
+    parser.add_argument("--save_dir", type=str, default="../../plots/control",
                         help="Directory to save the resulting scatter plot.")
     args = parser.parse_args()
 
