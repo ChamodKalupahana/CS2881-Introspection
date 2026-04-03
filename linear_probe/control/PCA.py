@@ -11,4 +11,5 @@
 
     # plot 2D matrix between layers and PCA components, colour=diff
 
-# return top 5 probes with greatest diff
+# return top 5 probes with greatest diff in each layer
+# or top 30 probes across all layers

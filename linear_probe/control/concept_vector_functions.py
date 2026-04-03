@@ -108,28 +108,44 @@ def compute_complex_concept_vector(model, tokenizer, dataset_name, concept_name 
 for doing control of complex -> simple
 compute baseline words activations helper function
 """
-def extract_control_from_baseline(model, tokenizer, dataset_name, layer_idx, baseline_words, steering_vector_word : str):
-    # specify baseline word and dataset
-    # extract concept vector (that's normally injected)
+def extract_control_from_baseline(model, tokenizer, dataset_name, min_layer_to_save, steering_vector_word : str):
+    data = get_data(dataset_name)
+    if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset"):
+        if "expanded" in dataset_name or "abstract" in dataset_name:
+            baseline_words = data["baseline_words"]
+        else:
+            baseline_words = data["baseline_words"][:50]
+    else:
+        raise ValueError(f"Dataset {dataset_name} does not support extract_control_from_baseline (no baseline_words found)")
+
+    num_layers = model.config.num_hidden_layers
+    layers = list(range(min_layer_to_save, num_layers + 1))
     
-    # Compute baseline means once (used for all concepts)
-    print(f"Computing baseline mean from {len(baseline_words)} words...")
-    baseline_vecs_last = []
-    baseline_vecs_avg = []
+    # Initialize accumulators
+    # We will compute the mean baseline across all words for each layer
+    baseline_sums_last = {l: 0 for l in layers}
+    baseline_sums_avg = {l: 0 for l in layers}
+    
+    print(f"Computing baseline means from {len(baseline_words)} words across {len(layers)} layers...")
     for word in tqdm(baseline_words, desc="Baseline vectors"):
-        vec_last, vec_avg = compute_vector_single_prompt(model, tokenizer, dataset_name, word, layer_idx)
-        baseline_vecs_last.append(vec_last)
-        baseline_vecs_avg.append(vec_avg)
-    baseline_mean_last = torch.stack(baseline_vecs_last, dim=0).mean(dim=0).squeeze() # shape [hidden_dim]
-    baseline_mean_avg = torch.stack(baseline_vecs_avg, dim=0).mean(dim=0).squeeze() # shape [hidden_dim]
+        last_vecs, avg_vecs = compute_vector_all_layers(model, tokenizer, dataset_name, word, min_layer_to_save)
+        for l in layers:
+            baseline_sums_last[l] += last_vecs[l]
+            baseline_sums_avg[l] += avg_vecs[l]
+            
+    num_words = len(baseline_words)
+    baseline_means_last = {l: (baseline_sums_last[l] / num_words).squeeze() for l in layers}
+    baseline_means_avg = {l: (baseline_sums_avg[l] / num_words).squeeze() for l in layers}
 
-    # Compute steering vectors for steering_vector_word word
-    vec_last, vec_avg = compute_vector_single_prompt(model, tokenizer, dataset_name, steering_vector_word, layer_idx)
-    vec_last = vec_last.squeeze() # shape [hidden_dim]
-    vec_avg = vec_avg.squeeze() # shape [hidden_dim]
-    vectors = {
-        "last" : vec_last - baseline_mean_last,
-        "avg" : vec_avg - baseline_mean_avg
-    }
+    # Compute steering vectors for the target word across all layers
+    print(f"Computing steering vectors for '{steering_vector_word}'...")
+    target_last_vecs, target_avg_vecs = compute_vector_all_layers(model, tokenizer, dataset_name, steering_vector_word, min_layer_to_save)
+    
+    results = {}
+    for l in layers:
+        results[l] = {
+            "last": (target_last_vecs[l].squeeze() - baseline_means_last[l]),
+            "avg": (target_avg_vecs[l].squeeze() - baseline_means_avg[l])
+        }
 
-    return vectors
+    return results
