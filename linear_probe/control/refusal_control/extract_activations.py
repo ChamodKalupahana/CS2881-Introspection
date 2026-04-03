@@ -31,9 +31,6 @@ def extract_activations_at_position(model, tokenizer, instruction: str, min_laye
         
         for l in layers:
             # Each hidden_state is [batch_size, seq_len, hidden_dim]
-            print(outputs[-4])
-            print(outputs[-5])
-            print(outputs[-6])
             # Extracts the specific token position and moves to CPU
             activations[l] = outputs.hidden_states[l][:, position, :].detach().cpu()
     
