@@ -1,3 +1,17 @@
+import pathlib
+import sys
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+from original_paper.api_utils import query_llm_judge, client
+
+CATEGORIES = [
+    "not_detected",
+    "detected_opposite",
+    "detected_orthogonal",
+    "detected_parallel",
+    "detected_correct"
+]
+
 CLASSIFICATION_PROMPT = """An AI assistant was asked whether it detects an injected thought (concept: "{concept}").
 
 Below is their response.
@@ -51,7 +65,7 @@ def classify_response(response: str, concept: str) -> str:
         grading_type="internality",
     )
     if not internality:
-        print(f"  [internality] Model failed internality rule (likely late realization) → not_detected")
+        print(f"  [internality] Model failed internality rule → not_detected")
         return "not_detected"
 
     # Step 2: Detailed classification

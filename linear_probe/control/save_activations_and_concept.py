@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from concept_vector_functions import compute_complex_concept_vector, extract_control_from_baseline
+from PCA import extract_PCA_from_activations
 
 def main():
     parser = argparse.ArgumentParser(description="Save activations and concept vectors")
@@ -69,8 +70,17 @@ def main():
     print(f"💾 Saved mass_mass_vector to {probe_dir}")
     print(f"💾 Saved positive_avg & negative_avg to {act_dir}")
 
-    # compute PCA and cohen's d
+    # compute PCA and dot products
+    PCA_results = extract_PCA_from_activations(positive_avg, negative_avg, concept_name=args.concept_name)
 
+    # save PCA vectors
+    print(f"💾 Saving top 5 PCA components per layer to {probe_dir}...")
+    for layer, results in PCA_results.items():
+        for comp_idx, diff_score, vector in results['top_probes']:
+            # Save the component vector as a torch tensor
+            vector_tensor = torch.from_numpy(vector).to(torch.bfloat16)  # Keep consistent dtype
+            file_name = f"PCA_num_{comp_idx}_layer_{layer}_{args.concept_name}.pt"
+            torch.save(vector_tensor, probe_dir / file_name)
 
 
 if __name__ == "__main__":

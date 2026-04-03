@@ -1,1 +1,0 @@
-# for each PCA componenet, measure dot product between it and postive and negative activations
