@@ -24,6 +24,7 @@ ENV/
 # new_results/*.parquet
 old_results/*.csv
 old_results/*.parquet
+dataset/brysbaert_concreteness/brysbaert_ratings.txt
 
 # Saved vectors (large binary files)
 saved_vectors/**/*.pt
