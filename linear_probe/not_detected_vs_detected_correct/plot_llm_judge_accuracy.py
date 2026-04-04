@@ -82,7 +82,7 @@ def main():
     ax.set_title('LLM Judge Accuracy Comparison')
     ax.set_xticks(x)
     ax.set_xticklabels(models, rotation=15, ha='right')
-    ax.set_ylim(0, 105)
+    ax.set_ylim(0, 120)
     ax.legend(loc='lower left')
 
     # Add labels on top of bars
@@ -101,7 +101,7 @@ def main():
 
     # Add Avg Time annotations
     for i, avg_time in enumerate(avg_times):
-        ax.text(i, 102, f'Avg: {avg_time:.2f}s/prompt', 
+        ax.text(i, 110, f'Avg: {avg_time:.2f}s/prompt', 
                 ha='center', va='bottom', fontsize=10, 
                 fontweight='bold', color='#444444',
                 bbox=dict(facecolor='white', alpha=0.6, edgecolor='none', boxstyle='round,pad=0.2'))

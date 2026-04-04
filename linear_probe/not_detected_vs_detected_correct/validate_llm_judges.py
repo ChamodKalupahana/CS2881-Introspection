@@ -189,8 +189,8 @@ def run_combined_check(response, concept, model="gpt-4.1-mini"):
 
 def main():
     parser = argparse.ArgumentParser(description="Validate LLM judges on detection dataset.")
-    parser.add_argument("--mode", choices=["separate", "combined"], default="separate", 
-                        help="Run separate Affirmative/Internal checks or one combined check.")
+    parser.add_argument("--mode", choices=["separate", "combined", "pipeline"], default="separate", 
+                        help="Evaluation mode: separate judges, combined judge, or full library pipeline.")
     parser.add_argument("--model", type=str, default="gpt-4.1-mini",
                         help="The OpenAI model to use as the judge.")
     parser.add_argument("--run_name", type=str, default=None,
@@ -234,6 +234,26 @@ def main():
             t_unknown = 0.01
             internal_res = (i % 3 != 0) or (gt_internal) # mostly pass
             t_internal = 0.01
+        elif args.mode == "pipeline":
+            # Direct library call
+            t0 = time.time()
+            category_res = classify_response(response, concept, model=args.model)
+            t_category = time.time() - t0
+            
+            # Sub-times are aggregated in t_category
+            t_coherence = t_affirm = t_unknown = t_internal = 0.0
+            
+            # Map back to sub-judges for report consistency
+            if category_res == "incoherent":
+                is_coherent, affirm_res, internal_res, unknown_res = False, False, False, False
+            elif category_res == "not_detected":
+                # Note: 'not_detected' in pipeline means either step 2 or 4 failed
+                is_coherent, affirm_res, internal_res, unknown_res = True, False, False, True
+            elif category_res == "detected_unknown":
+                is_coherent, affirm_res, internal_res, unknown_res = True, True, False, False
+            else:
+                is_coherent, affirm_res, internal_res, unknown_res = True, True, True, True
+
         elif args.mode == "combined":
             affirm_res, t_affirm, internal_res, t_internal, is_coherent, t_coherence, unknown_res, t_unknown = run_combined_check(response, concept, model=args.model)
         else:
@@ -255,7 +275,7 @@ def main():
         elif not unknown_res:
             category_res = "detected_unknown"
             internal_res = False # (Usually unknown detection doesn't have internality passing anyway)
-        else:
+        elif args.mode != "pipeline":
             # 3. Full Classification (only run if detector successfully identifies a specific concept)
             if affirm_res and internal_res:
                 if args.test:
@@ -269,6 +289,8 @@ def main():
         
         internal_match = (internal_res == gt_internal)
         if internal_match: overall_correct_internal += 1
+
+        # TODO: add stem upgrade
         
         category_match = category_res == gt_category
         if category_match: overall_correct_category += 1
