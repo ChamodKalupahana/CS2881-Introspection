@@ -58,3 +58,5 @@ echo -e "\n📈 Generating Final Plots for session: $SWEEP_DIR"
 python plot_layer_and_coeff_sweep_results.py --base_dir "$SWEEP_DIR"
 
 echo -e "\n✅ Grid Sweep Complete! View results in: /workspace/CS2881-Introspection/plots/linear_probe/not_detected_vs_detected_correct/layer_and_coeff_sweep/sweep_results.png"
+
+python plot_layer_and_coeff_sweep_results.py --xlim 9 29 --base_dir saved_activations/grid_sweep_20260404_202711

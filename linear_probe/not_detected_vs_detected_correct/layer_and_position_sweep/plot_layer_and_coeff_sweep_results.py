@@ -47,7 +47,7 @@ def load_sweep_results(base_dir):
                 
     return data
 
-def plot_results(data, output_dir=None):
+def plot_results(data, output_dir=None, xlim=None):
     if not data:
         print("No data found to plot!")
         return
@@ -66,8 +66,6 @@ def plot_results(data, output_dir=None):
     coeffs = sorted(list(set(d["coeff"] for d in data)))
     
     fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharex=True)
-
-    # TODO: combine into one graph, of just detected_correct 
     
     for i, metric in enumerate(metrics):
         ax = axes[i]
@@ -83,11 +81,15 @@ def plot_results(data, output_dir=None):
         ax.set_title(titles[i], fontweight='bold')
         ax.set_xlabel("Layer Index")
         ax.grid(True, linestyle='--', alpha=0.6)
+        ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
         if i == 0:
             ax.set_ylabel("Percentage (%)")
         
         # Consistent Y-axis for percentages
         ax.set_ylim(-5, 105)
+        
+        if xlim:
+            ax.set_xlim(xlim)
 
     # Shared Legend
     handles, labels = axes[0].get_legend_handles_labels()
@@ -105,7 +107,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot results from the layer/coeff sweep.")
     parser.add_argument("--base_dir", type=str, default="saved_activations", help="Directory containing sweep runs.")
     parser.add_argument("--output_dir", type=str, default=str(default_out), help="Where to save the plot.")
+    parser.add_argument("--xlim", type=int, nargs=2, help="X-axis limits (min_layer max_layer).")
     args = parser.parse_args()
 
     results = load_sweep_results(args.base_dir)
-    plot_results(results, args.output_dir)
+    plot_results(results, args.output_dir, args.xlim)
