@@ -6,18 +6,25 @@ N_SAMPLES=10
 VECTOR_TYPE="average"
 MAX_TOKENS=50
 
-# Sweep Grids
+# Default Sweep Grids (Broad)
 COEFFS=(2 4 6 8)
 LAYERS=(10 14 18 22 24 26 28)
+MODE="zoomed"
 
-# Check for --test flag
+# Check for flags
 TEST_FLAG=""
 for arg in "$@"; do
     if [ "$arg" == "--test" ]; then
         TEST_FLAG="--test"
         echo "🛠️  Running in TEST MODE (Fake Data)"
+    elif [ "$arg" == "--zoomed" ]; then
+        MODE="zoomed"
+        COEFFS=(3 4 5 6)
+        LAYERS=(10 11 12 13 14 15 16 17 18)
     fi
 done
+
+echo "🔍 Sweep Mode: $MODE"
 
 # Create a unique directory for this entire sweep session
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -59,4 +66,4 @@ python plot_layer_and_coeff_sweep_results.py --base_dir "$SWEEP_DIR"
 
 echo -e "\n✅ Grid Sweep Complete! View results in: /workspace/CS2881-Introspection/plots/linear_probe/not_detected_vs_detected_correct/layer_and_coeff_sweep/sweep_results.png"
 
-python plot_layer_and_coeff_sweep_results.py --xlim 9 29 --base_dir saved_activations/grid_sweep_20260404_202711
+# python plot_layer_and_coeff_sweep_results.py --xlim 9 29 --base_dir saved_activations/grid_sweep_20260404_202711
