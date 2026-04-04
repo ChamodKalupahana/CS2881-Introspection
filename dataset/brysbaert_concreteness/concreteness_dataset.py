@@ -5,9 +5,24 @@ import json
 import os
 import urllib.request
 import numpy as np
+import argparse
 
-num_of_concept_vector_words = 4500
-num_of_baseline_words = 20000
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate concreteness dataset from Brysbaert ratings.")
+    parser.add_argument("--num_concept_vector_words", type=int, default=4500, help="Number of concept vector words to extract")
+    parser.add_argument("--num_baseline_words", type=int, default=20000, help="Number of baseline words to extract")
+    parser.add_argument("--abstractness_threshold", type=float, default=2.5, help="Threshold for abstract words (Mean Concreteness < value)")
+    parser.add_argument("--baseline_concreteness_threshold", type=float, default=3.5, help="Threshold for baseline concrete words (Mean Concreteness >= value)")
+    parser.add_argument("--output_file", type=str, default="brysbaert_abstract_nouns.json", help="Name of the output JSON file")
+    return parser.parse_args()
+
+args = parse_args()
+
+num_of_concept_vector_words = args.num_concept_vector_words
+num_of_baseline_words = args.num_baseline_words
+abstractness_threshold = args.abstractness_threshold
+baseline_concreteness_threshold = args.baseline_concreteness_threshold
+output_file_name = args.output_file
 
 # Ensure NLTK WordNet is ready
 try:
@@ -93,8 +108,8 @@ print("Loading data...")
 df = pd.read_csv(file_path, sep='\t')
 
 # The column 'Conc.M' is the Mean Concreteness rating (1.0 = highly abstract, 5.0 = highly concrete)
-# We want words with a rating less than 2.2 (This captures very strong abstractions)
-abstract_df = df[df['Conc.M'] < 2.5].copy()
+# We want words with a low rating (This captures strong abstractions)
+abstract_df = df[df['Conc.M'] < abstractness_threshold].copy()
 
 # Sort by abstractness (lowest to highest)
 abstract_df = abstract_df.sort_values(by='Conc.M', ascending=True)
@@ -130,7 +145,7 @@ print("\nHere is a sample of the tail end (last 20):")
 print(abstract_nouns[-20:])
 
 # baseline words
-baseline_df = df[df['Conc.M'] >= 3.5].copy()
+baseline_df = df[df['Conc.M'] >= baseline_concreteness_threshold].copy()
 
 print("size: ", np.shape(baseline_df))
 
@@ -160,7 +175,7 @@ dataset = {
     "baseline_words" : baseline_list
 }
 
-output_path = os.path.join(os.path.dirname(__file__), 'brysbaert_abstract_nouns.json')
+output_path = os.path.join(os.path.dirname(__file__), output_file_name)
 with open(output_path, 'w') as f:
     json.dump(dataset, f, indent=4)
     
