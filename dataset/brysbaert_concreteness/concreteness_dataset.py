@@ -29,9 +29,27 @@ def is_too_technical(word):
         return True
     return False
 
-def is_noun(word):
-    """Check if the word can be classified as a noun in WordNet"""
-    return len(wn.synsets(word, pos=wn.NOUN)) > 0
+def is_strictly_noun(word):
+    """
+    Checks if the word is PRIMARILY a noun, not just technically a noun.
+    """
+    synsets = wn.synsets(word)
+    if not synsets:
+        return False
+        
+    # Check if the most common usage (the first synset) is a noun
+    primary_pos = synsets[0].pos()
+    if primary_pos != wn.NOUN:
+        return False
+        
+    # Secondary check: ensure it doesn't have an overwhelming number of verb/adj usages
+    noun_count = len([s for s in synsets if s.pos() == wn.NOUN])
+    other_count = len([s for s in synsets if s.pos() != wn.NOUN])
+    
+    if other_count > noun_count:
+        return False
+        
+    return True
 
 print("Downloading Brysbaert Concreteness Dataset...")
 url = "https://raw.githubusercontent.com/ArtsEngine/concreteness/master/Concreteness_ratings_Brysbaert_et_al_BRM.txt"
@@ -66,7 +84,7 @@ for index, row in abstract_df.iterrows():
     if is_too_technical(word):
         continue
         
-    if not is_noun(word):
+    if not is_strictly_noun(word):
         continue
         
     abstract_nouns.append(word)
