@@ -15,3 +15,4 @@ scipy
 sentence-transformers
 nltk
 einops
+gensim

@@ -24,6 +24,7 @@ ENV/
 # new_results/*.parquet
 old_results/*.csv
 old_results/*.parquet
+dataset/brysbaert_concreteness/brysbaert_ratings.txt
 
 # Saved vectors (large binary files)
 saved_vectors/**/*.pt
@@ -32,6 +33,7 @@ acitvation_patching/**/*.pt
 DLA/**/*.pt
 PCA/**/*.pt
 linear_probe/**/*.pt
+!linear_probe/control/refusal_control/ground_truth_probe/direction.pt
 
 # Plots (can be regenerated)
 # plots/*.png

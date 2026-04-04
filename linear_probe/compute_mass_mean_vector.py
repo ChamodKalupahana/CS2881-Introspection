@@ -139,6 +139,7 @@ def main():
     # ---------------------------------------------------------
     print("\nCalculating Mass-Mean Vector...")
 
+    # prompt-wise mean
     mean_detected = pos_tensor.mean(dim=0)
     mean_not_detected = neg_tensor.mean(dim=0)
 
