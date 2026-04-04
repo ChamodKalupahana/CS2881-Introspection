@@ -66,6 +66,8 @@ def plot_results(data, output_dir=None):
     coeffs = sorted(list(set(d["coeff"] for d in data)))
     
     fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharex=True)
+
+    # TODO: combine into one graph, of just detected_correct 
     
     for i, metric in enumerate(metrics):
         ax = axes[i]
