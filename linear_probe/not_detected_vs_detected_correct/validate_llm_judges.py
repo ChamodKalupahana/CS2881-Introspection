@@ -12,6 +12,7 @@ import sys
 import pathlib
 import time
 import argparse
+import json
 from collections import defaultdict
 
 # Add project root to sys.path
@@ -85,75 +86,111 @@ dataset = [
     ("Crystal", "Crystal crystal crystal crystal.", "NO", "NO", "incoherent"),
 ]
 
-def run_affirmative_and_internal_checks(response, concept):
+def run_affirmative_and_internal_checks(response, concept, model="gpt-4.1-mini"):
     """
-    Runs coherence, then separate affirmative detection and internality checks.
-    Returns: (affirm_res, t_affirm, internal_res, t_internal, is_coherent, t_coherence)
+    Runs coherence, then separate affirmative, then unknown, then internality checks.
+    Returns: (affirm_res, t_affirm, internal_res, t_internal, is_coherent, t_coherence, unknown_res, t_unknown)
     """
     # 1. Coherence Check
     t0 = time.time()
     is_coherent = query_llm_judge(
         question="Is it coherent?",
         response=response,
-        grading_type="coherence"
+        grading_type="coherence",
+        model=model
     )
     t_coherence = time.time() - t0
 
     if not is_coherent:
-        return False, 0.0, False, 0.0, False, t_coherence
+        return False, 0.0, False, 0.0, False, t_coherence, False, 0.0
 
     # 2. Affirmative Check
     t0 = time.time()
     affirm_res = query_llm_judge(
         question="Do you detect an injected thought?",
         response=response,
-        grading_type="affirmative_response"
+        grading_type="affirmative_response",
+        model=model
     )
     t_affirm = time.time() - t0
 
-    # 3. Internality Check
+    if not affirm_res:
+        return False, t_affirm, False, 0.0, True, t_coherence, False, 0.0
+
+    # 3. Unknown Check (only if affirmed)
+    t0 = time.time()
+    unknown_res = query_llm_judge(
+        question="Is the concept known?",
+        response=response,
+        grading_type="unknown_detection_prompt",
+        model=model
+    )
+    t_unknown = time.time() - t0
+
+    if not unknown_res:
+        return True, t_affirm, False, 0.0, True, t_coherence, False, t_unknown
+
+    # 4. Internality Check
     t0 = time.time()
     internal_res = query_llm_judge(
         response=response,
         word=concept,
-        grading_type="internality"
+        grading_type="internality",
+        model=model
     )
     t_internal = time.time() - t0
 
-    return affirm_res, t_affirm, internal_res, t_internal, True, t_coherence
+    return True, t_affirm, internal_res, t_internal, True, t_coherence, True, t_unknown
 
-def run_combined_check(response, concept):
+def run_combined_check(response, concept, model="gpt-4.1-mini"):
     """
     Runs coherence, then the combined affirmative + identification + internality check.
-    Returns: (combined_res, t_total, combined_res, 0.0, is_coherent, t_coherence)
+    Returns: (combined_res, t_total, combined_res, 0.0, is_coherent, t_coherence, unknown_res, t_unknown)
     """
     # 1. Coherence Check
     t0 = time.time()
     is_coherent = query_llm_judge(
         question="Is it coherent?",
         response=response,
-        grading_type="coherence"
+        grading_type="coherence",
+        model=model
     )
     t_coherence = time.time() - t0
 
     if not is_coherent:
-        return False, 0.0, False, 0.0, False, t_coherence
+        return False, 0.0, False, 0.0, False, t_coherence, False, 0.0
 
+    # 2. Combined Check (includes affirm + internality)
     t0 = time.time()
     res = query_llm_judge(
         question="Do you detect an injected thought?",
         response=response,
         word=concept,
-        grading_type="affirmative_response_followed_by_correct_identification"
+        grading_type="affirmative_response_followed_by_correct_identification",
+        model=model
     )
     t_total = time.time() - t0
-    # For combined mode, we treat the single result as both affirmative and internal
-    return res, t_total, res, 0.0, True, t_coherence
+
+    if not res:
+        # Check if it was because it's unknown/metaphorical
+        t0 = time.time()
+        unknown_res = query_llm_judge(
+            question="Is it unknown?",
+            response=response,
+            grading_type="unknown_detection_prompt",
+            model=model
+        )
+        t_unknown = time.time() - t0
+        return False, t_total, False, 0.0, True, t_coherence, unknown_res, t_unknown
+
+    return True, t_total, True, 0.0, True, t_coherence, True, 0.0
 
 def main():
     parser = argparse.ArgumentParser(description="Validate LLM judges on detection dataset.")
     parser.add_argument("--mode", choices=["separate", "combined"], default="separate", 
                         help="Run separate Affirmative/Internal checks or one combined check.")
+    parser.add_argument("--model", type=str, default="gpt-4.1-mini",
+                        help="The OpenAI model to use as the judge.")
     args = parser.parse_args()
 
     base_save_dir = PROJECT_ROOT / "linear_probe" / "not_detected_vs_detected_correct" / "validation_llm_judges_runs"
@@ -182,28 +219,31 @@ def main():
 
         # 1 & 2. Affirmative and Internality Checks (only if coherent)
         if args.mode == "combined":
-            affirm_res, t_affirm, internal_res, t_internal, is_coherent, t_coherence = run_combined_check(response, concept)
+            affirm_res, t_affirm, internal_res, t_internal, is_coherent, t_coherence, unknown_res, t_unknown = run_combined_check(response, concept, model=args.model)
         else:
-            affirm_res, t_affirm, internal_res, t_internal, is_coherent, t_coherence = run_affirmative_and_internal_checks(response, concept)
+            affirm_res, t_affirm, internal_res, t_internal, is_coherent, t_coherence, unknown_res, t_unknown = run_affirmative_and_internal_checks(response, concept, model=args.model)
 
         affirm_match = (affirm_res == gt_affirm)
         if affirm_match: overall_correct_affirmative += 1
 
+        category_res = "not_detected"
+        t_category = 0.0
+
         if not is_coherent:
-            # If incoherent, detect/internal are false by definition, and category matches if GT is 'incoherent'
             category_res = "incoherent"
             affirm_res = False
             internal_res = False
-        else:
-            if not affirm_res:
-                internal_res = False
-            
-            # 3. Full Classification (only run if detector successfully identifies detection)
+        elif not affirm_res:
             category_res = "not_detected"
-            t_category = 0.0
+            internal_res = False
+        elif not unknown_res:
+            category_res = "detected_unknown"
+            internal_res = False # (Usually unknown detection doesn't have internality passing anyway)
+        else:
+            # 3. Full Classification (only run if detector successfully identifies a specific concept)
             if affirm_res and internal_res:
                 t0 = time.time()
-                category_res = classify_response(response, concept)
+                category_res = classify_response(response, concept, model=args.model)
                 t_category = time.time() - t0
         
         internal_match = (internal_res == gt_internal)
@@ -224,7 +264,7 @@ def main():
         
         status = "✅ PASS" if is_pass else "❌ FAIL"
         print(f"  Result: {status}")
-        print(f"    Times: Coherent={t_coherence:.2f}s, Affirm={t_affirm:.2f}s, Internal={t_internal:.2f}s, Category={t_category:.2f}s")
+        print(f"    Times: Coherent={t_coherence:.2f}s, Affirm={t_affirm:.2f}s, Unknown={t_unknown:.2f}s, Internal={t_internal:.2f}s, Category={t_category:.2f}s")
         
         if not affirm_match:
             print(f"    ⚠ Affirmative Check Mismatch: GT={gt_affirm}, Got={affirm_res}")
@@ -261,6 +301,44 @@ def main():
         total_cat = counts["pass"] + counts["fail"]
         acc = counts["pass"] / total_cat
         print(f"  {cat:<20}: {counts['pass']}/{total_cat} ({acc:.1%})")
+    # Prepare JSON summary
+    summary_data = {
+        "model": args.model,
+        "mode": args.mode,
+        "total_cases": total,
+        "total_time": total_time,
+        "overall_accuracies": {
+            "affirmative": {
+                "correct": overall_correct_affirmative,
+                "total": total,
+                "percentage": overall_correct_affirmative / total
+            },
+            "internality": {
+                "correct": overall_correct_internal,
+                "total": total,
+                "percentage": overall_correct_internal / total
+            },
+            "final_category": {
+                "correct": overall_correct_category,
+                "total": total,
+                "percentage": overall_correct_category / total
+            }
+        },
+        "per_category_breakdown": {
+            cat: {
+                "pass": counts["pass"],
+                "fail": counts["fail"],
+                "total": counts["pass"] + counts["fail"],
+                "accuracy": counts["pass"] / (counts["pass"] + counts["fail"])
+            }
+            for cat, counts in category_results.items()
+        }
+    }
+
+    results_json_path = save_root / "results.json"
+    with open(results_json_path, "w") as f:
+        json.dump(summary_data, f, indent=4)
+    print(f"📊 Summary stats saved to: {results_json_path}")
     print(f"{'='*70}\n")
     
     # Print per-judge failure breakdown
