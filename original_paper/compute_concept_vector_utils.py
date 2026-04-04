@@ -35,9 +35,15 @@ def get_data(dataset_name):
     # Dataset is in the project root, which is one level up from original_paper
     dataset_dir = script_dir.parent / "dataset"
     
-    if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset"):
+    if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset" or "brysbaert" in dataset_name):
         clean_name = dataset_name if dataset_name.endswith(".json") else f"{dataset_name}.json"
-        with open(dataset_dir / clean_name, "r") as f:
+        
+        # Check both the base dataset directory and the brysbaert_concreteness subdirectory
+        full_path = dataset_dir / clean_name
+        if not full_path.exists():
+            full_path = dataset_dir / "brysbaert_concreteness" / clean_name
+            
+        with open(full_path, "r") as f:
             data = json.load(f)
         return data
     elif dataset_name == "complex_data":
@@ -97,7 +103,7 @@ def compute_concept_vector(model, tokenizer, dataset_name, layer_idx):
     data = get_data(dataset_name)
     steering_vectors = {}
     
-    if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset"):
+    if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset" or "brysbaert" in dataset_name):
         concept_words = data["concept_vector_words"]
         
         # Use only 50 for the original simple_data string to preserve original behavior, 

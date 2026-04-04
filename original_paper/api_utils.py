@@ -30,11 +30,11 @@ def query_llm_judge(question = None, response = None, word = None, grading_type 
         prompt = internality_prompt.format(target_concept=word, model_response=response)
     try: 
         completion = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt}]
         )
         judge_response_text = completion.choices[0].message.content
-        print("\n    [Judge Affirmative Check]:")
+        print(f"\n    [Judge Check: {grading_type}]:")
         for line in judge_response_text.split("\n"):
             print(f"      {line}")
     except Exception as e:
