@@ -4,6 +4,10 @@ from nltk.corpus import wordnet as wn
 import json
 import os
 import urllib.request
+import numpy as np
+
+num_of_concept_vector_words = 4500
+num_of_baseline_words = 20000
 
 # Ensure NLTK WordNet is ready
 try:
@@ -51,6 +55,32 @@ def is_strictly_noun(word):
         
     return True
 
+def is_strictly_physical_noun(word):
+    word = str(word).lower()
+    
+    # 1. Brutal morphological filter to kill verbs
+    if word.endswith('ing') or word.endswith('ed'):
+        return False
+        
+    synsets = wn.synsets(word)
+    if not synsets:
+        return False
+        
+    # 2. The primary (most common) definition MUST be a noun
+    if synsets[0].pos() != wn.NOUN:
+        return False
+        
+    # 3. Reject if the word has too many verb definitions 
+    # (This kills words like "construct" and "say")
+    verb_count = len([s for s in synsets if s.pos() == wn.VERB])
+    noun_count = len([s for s in synsets if s.pos() == wn.NOUN])
+    
+    if verb_count >= noun_count:
+        return False
+        
+    return True
+
+
 print("Downloading Brysbaert Concreteness Dataset...")
 url = "https://raw.githubusercontent.com/ArtsEngine/concreteness/master/Concreteness_ratings_Brysbaert_et_al_BRM.txt"
 file_path = "brysbaert_ratings.txt"
@@ -89,7 +119,7 @@ for index, row in abstract_df.iterrows():
         
     abstract_nouns.append(word)
     
-    if len(abstract_nouns) >= 4500:
+    if len(abstract_nouns) >= num_of_concept_vector_words:
         break
 
 print(f"\nSuccessfully generated {len(abstract_nouns)} pure abstract nouns.")
@@ -99,9 +129,35 @@ print(abstract_nouns[:20])
 print("\nHere is a sample of the tail end (last 20):")
 print(abstract_nouns[-20:])
 
+# baseline words
+baseline_df = df[df['Conc.M'] >= 3.5].copy()
+
+print("size: ", np.shape(baseline_df))
+
+baseline_list = []
+baseline_seen = set()
+for index, row in baseline_df.iterrows():
+    word = str(row['Word']).lower()
+    if is_too_technical(word):
+        continue
+
+    if not is_strictly_physical_noun(word):
+        continue
+    
+    if word in baseline_seen:
+        continue
+    
+    baseline_list.append(word)
+
+    if len(baseline_list) > num_of_baseline_words:
+        break
+
+print(f"found {len(baseline_list)} baseline words")
+
 # Save to JSON
 dataset = {
-    "concept_vector_words": abstract_nouns
+    "concept_vector_words": abstract_nouns,
+    "baseline_words" : baseline_list
 }
 
 output_path = os.path.join(os.path.dirname(__file__), 'brysbaert_abstract_nouns.json')
