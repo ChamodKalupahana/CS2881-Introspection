@@ -55,7 +55,7 @@ detected_orthogonal if:
 
 End your response with just the category name. Nothing else."""
 
-def classify_response(response: str, concept: str, model: str = "gpt-4.1-mini") -> str:
+def classify_response(response: str, concept: str, model: str = "gpt-5.4-nano") -> str:
     """
     Classify the model's response into one of the new categories:
     'not_detected', 'detected_opposite', 'detected_orthogonal', 

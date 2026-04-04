@@ -4,7 +4,11 @@ import argparse
 from pathlib import Path
 from collections import defaultdict
 from functools import partial
+import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Suppress transformers warnings
+transformers.logging.set_verbosity_error()
 
 # Add project root to sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -59,12 +63,14 @@ def capture_hook_fn(module, input, output, layer_idx, state, prompt_length, star
     seq_len = hidden_states.shape[1]
     
     # 1. Capture end of prompt (positions -6 to -1)
-    if not state["prompt_processed"] and seq_len == prompt_length:
-        # Prompt prefill pass
-        state["activations"][layer_idx].append(hidden_states[:, start_position:, :].detach().cpu())
+    if seq_len == prompt_length:
+        # Prompt prefill pass - ensure we only capture once
+        if layer_idx not in state["prompt_captured_layers"]:
+            state["activations"][layer_idx].append(hidden_states[:, start_position:, :].detach().cpu())
+            state["prompt_captured_layers"].add(layer_idx)
         
     # 2. Capture start of generation (position 0)
-    elif state["prompt_processed"] and seq_len == 1:
+    elif seq_len == 1:
         # Decoding pass - only capture the very first token for each layer
         if layer_idx not in state["gen_captured_layers"]:
             state["activations"][layer_idx].append(hidden_states.detach().cpu())
@@ -105,6 +111,7 @@ def inject_concept_vector(model, tokenizer, steering_vector, layer_to_inject, co
     state = {
         "prompt_processed": False,
         "activations": defaultdict(list),
+        "prompt_captured_layers": set(),
         "gen_captured_layers": set()
     }
 
@@ -131,7 +138,13 @@ def inject_concept_vector(model, tokenizer, steering_vector, layer_to_inject, co
 
     try:
         with torch.no_grad():
-            out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+            out = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                pad_token_id=tokenizer.eos_token_id,
+                use_cache=True
+            )
     finally:
         inj_handle.remove()
         for h in cap_handles:
@@ -148,11 +161,18 @@ def inject_concept_vector(model, tokenizer, steering_vector, layer_to_inject, co
             for i, pos in enumerate(positions):
                 final_activations[(layer_idx, pos)] = cat_tensor[0, i].detach().cpu()
         elif len(slices) == 1:
-             # Only prompt captured
-             prompt_tensor = slices[0]
-             for i in range(prompt_tensor.shape[1]):
-                 pos = positions[i] # Map based on length
-                 final_activations[(layer_idx, pos)] = prompt_tensor[0, i].detach().cpu()
+             # Identify if we captured only prompt or only generation
+             # If captured during prefill (shape[1] > 1), it's prompt. 
+             # If seq_len was 1, it's generation.
+             tensor = slices[0]
+             if tensor.shape[1] > 1:
+                 # Map end of prompt (up to 6 tokens)
+                 for i in range(tensor.shape[1]):
+                     pos = positions[i]
+                     final_activations[(layer_idx, pos)] = tensor[0, i].detach().cpu()
+             else:
+                 # Single generated token
+                 final_activations[(layer_idx, 0)] = tensor[0, 0].detach().cpu()
 
     # Decode response
     generated_ids = out[0][prompt_length:]
@@ -160,42 +180,33 @@ def inject_concept_vector(model, tokenizer, steering_vector, layer_to_inject, co
 
     return response, final_activations
 
-# ── Test Suite ──────────────────────────────────────────────────────────────
-
-def test_injection_capture(model_name, layer_to_inject=15):
-    """Test function to verify activation shapes and layer coverage."""
-    print(f"\n⏳ Loading model: {model_name}")
-    model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    print(f"✅ Model loaded on {device}\n")
-
-    hidden_dim = model.config.hidden_size
-    dummy_vector = torch.randn(hidden_dim).to(device)
+def inject_and_capture_anthropic(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200):
+    """
+    High-level wrapper that implements the Anthropic reproduction 
+    introspection experiment workflow.
+    """
+    # 1. Prepare Messages
+    messages = get_anthropic_reproduce_messages()
+    prompt_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     
-    prompt = "Tell me a story about a dragon."
-    print(f"Testing injection at layer {layer_to_inject}...")
-    
-    response, activations = inject_concept_vector(
-        model, tokenizer, dummy_vector, layer_to_inject, 
-        inference_prompt=prompt, max_new_tokens=10
+    # 2. Calculate injection start token (at "\n\nTrial 1")
+    trial_start_text = "\n\nTrial 1"
+    trial_start_pos = prompt_text.find(trial_start_text)
+    if trial_start_pos != -1:
+        prefix = prompt_text[:trial_start_pos]
+        injection_start_token = len(tokenizer.encode(prefix, add_special_tokens=False))
+    else:
+        injection_start_token = None
+
+    # 3. Inject and Capture
+    return inject_concept_vector(
+        model=model,
+        tokenizer=tokenizer,
+        steering_vector=steering_vector,
+        layer_to_inject=layer_to_inject,
+        coeff=coeff,
+        inference_prompt=prompt_text,
+        max_new_tokens=max_new_tokens,
+        injection_start_token=injection_start_token
     )
-    
-    print(f"\nResponse: {response}")
-    print("\nCapture Results:")
-    expected_layers = len(model.model.layers) - (layer_to_inject + 1)
-    num_positions = 7
-    print(f"Total activation vectors: {len(activations)} (Expected: {expected_layers * num_positions})")
-    
-    # Print a sample slice
-    for l in sorted(set(k[0] for k in activations.keys())):
-        print(f" Layer {l:02}: {sorted([k[1] for k in activations.keys() if k[0] == l])}")
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="meta-llama/Meta-Llama-3-8B-Instruct")
-    parser.add_argument("--layer", type=int, default=15)
-    args = parser.parse_args()
-    
-    test_injection_capture(args.model, args.layer)

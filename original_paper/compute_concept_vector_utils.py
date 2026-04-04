@@ -105,13 +105,7 @@ def compute_concept_vector(model, tokenizer, dataset_name, layer_idx):
     
     if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset" or "brysbaert" in dataset_name):
         concept_words = data["concept_vector_words"]
-        
-        # Use only 50 for the original simple_data string to preserve original behavior, 
-        # but all for expanded datasets or the new abstract nouns dataset
-        if "expanded" in dataset_name or "abstract" in dataset_name:
-            baseline_words = data["baseline_words"]
-        else:
-            baseline_words = data["baseline_words"][:50]
+        baseline_words = data["baseline_words"]
         
         # Compute baseline means once (used for all concepts)
         print(f"Computing baseline mean from {len(baseline_words)} words...")
