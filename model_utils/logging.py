@@ -20,7 +20,7 @@ class TeeLogger:
     def fileno(self):
         return self.stream.fileno()
 
-def setup_logging(base_save_dir: str, categories: list = None):
+def setup_logging(base_save_dir: str, categories: list = None, run_name: str = None):
     """
     Sets up a timestamped run directory and redirects stdout/stderr to a log file.
     
@@ -32,8 +32,10 @@ def setup_logging(base_save_dir: str, categories: list = None):
         save_root (Path): The Path to the current run's directory.
         log_file (file object): The opened log file (need to close it at the end).
     """
-    now = datetime.now()
-    run_name = now.strftime("run_%m_%d_%y_%H_%M")
+    if not run_name:
+        now = datetime.now()
+        run_name = now.strftime("run_%m_%d_%y_%H_%M")
+    
     save_root = Path(base_save_dir) / run_name
     save_root.mkdir(parents=True, exist_ok=True)
 

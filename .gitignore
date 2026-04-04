@@ -25,6 +25,7 @@ ENV/
 old_results/*.csv
 old_results/*.parquet
 dataset/brysbaert_concreteness/brysbaert_ratings.txt
+linear_probe/not_detected_vs_detected_correct/validation_llm_judges_runs/*
 
 # Saved vectors (large binary files)
 saved_vectors/**/*.pt

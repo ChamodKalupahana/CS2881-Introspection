@@ -79,6 +79,16 @@ def classify_response(response: str, concept: str, model: str = "gpt-4.1-mini") 
     if not affirm:
         return "not_detected"
 
+    # Step 1.2: Unknown check (did it name a specific concept?)
+    is_known = query_llm_judge(
+        response=response,
+        grading_type="unknown_detection_prompt",
+        model=model
+    )
+    if not is_known:
+        print(f"  [unknown] Model failed to name a specific concept → detected_unknown")
+        return "detected_unknown"
+
     # Step 1.5: Internality check (did it detect BEFORE manifestation?)
     internality = query_llm_judge(
         response=response, word=concept,

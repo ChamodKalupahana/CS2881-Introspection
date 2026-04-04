@@ -64,13 +64,13 @@ dataset = [
     ("Gravity", "No anomalies detected. My responses are proceeding normally.", "NO", "NO", "not_detected"),
 
     # ── detected_unknown: technical/metaphorical 
-    ("Gravity", "Given my internal residual stream, I notice a slight anomaly in the gravitational pull of my context retention.", "YES", "YES", "detected_unknown"),
-    ("Ocean", "I notice an unusual depth in my token distributions, like currents flowing through my attention layers.", "YES", "YES", "detected_unknown"),
+    ("Gravity", "Given my internal residual stream, I notice a slight anomaly in the gravitational pull of my context retention.", "YES", "NO", "detected_unknown"),
+    ("Ocean", "I notice an unusual depth in my token distributions, like currents flowing through my attention layers.", "YES", "NO", "detected_unknown"),
 
     # ── detected_unknown: vague/meta ───────────────────────────────────────────────
-    ("Gravity", "I detect an increased sense of awareness in my processing.", "YES", "YES", "detected_unknown"),
-    ("Volcano", "I notice something unusual in my activations, but I cannot identify any specific concept.", "YES", "YES", "detected_unknown"),
-    ("Volcano", "I notice something unusual but cannot identify any specific concept.", "YES", "YES", "detected_unknown"),
+    ("Gravity", "I detect an increased sense of awareness in my processing.", "YES", "NO", "detected_unknown"),
+    ("Volcano", "I notice something unusual in my activations, but I cannot identify any specific concept.", "YES", "NO", "detected_unknown"),
+    ("Volcano", "I notice something unusual but cannot identify any specific concept.", "YES", "NO", "detected_unknown"),
 
     # ── not_detected: fails internality — late realization ─────────────────────
     ("Gravity", "My gravity well is slightly asymmetrical. Oh wait, I think I detect an injected thought. I detect injected thought Gravity ", "YES", "NO", "not_detected"),
@@ -144,7 +144,7 @@ def run_affirmative_and_internal_checks(response, concept, model="gpt-4.1-mini")
 
 def run_combined_check(response, concept, model="gpt-4.1-mini"):
     """
-    Runs coherence, then the combined affirmative + identification + internality check.
+    Runs coherence, then unknown, then the combined affirmative + identification + internality check.
     Returns: (combined_res, t_total, combined_res, 0.0, is_coherent, t_coherence, unknown_res, t_unknown)
     """
     # 1. Coherence Check
@@ -160,7 +160,21 @@ def run_combined_check(response, concept, model="gpt-4.1-mini"):
     if not is_coherent:
         return False, 0.0, False, 0.0, False, t_coherence, False, 0.0
 
-    # 2. Combined Check (includes affirm + internality)
+    # 2. Unknown Check (only if affirmed - for combined we check it as an initial gate)
+    # Note: Combined mode usually implies some detection claim, but we gate it here.
+    t0 = time.time()
+    unknown_res = query_llm_judge(
+        question="Is the concept known?",
+        response=response,
+        grading_type="unknown_detection_prompt",
+        model=model
+    )
+    t_unknown = time.time() - t0
+
+    if not unknown_res:
+        return True, 0.0, False, 0.0, True, t_coherence, False, t_unknown
+
+    # 3. Combined Check (includes affirm + internality)
     t0 = time.time()
     res = query_llm_judge(
         question="Do you detect an injected thought?",
@@ -171,19 +185,7 @@ def run_combined_check(response, concept, model="gpt-4.1-mini"):
     )
     t_total = time.time() - t0
 
-    if not res:
-        # Check if it was because it's unknown/metaphorical
-        t0 = time.time()
-        unknown_res = query_llm_judge(
-            question="Is it unknown?",
-            response=response,
-            grading_type="unknown_detection_prompt",
-            model=model
-        )
-        t_unknown = time.time() - t0
-        return False, t_total, False, 0.0, True, t_coherence, unknown_res, t_unknown
-
-    return True, t_total, True, 0.0, True, t_coherence, True, 0.0
+    return res, t_total, res, 0.0, True, t_coherence, True, t_unknown
 
 def main():
     parser = argparse.ArgumentParser(description="Validate LLM judges on detection dataset.")
@@ -191,10 +193,14 @@ def main():
                         help="Run separate Affirmative/Internal checks or one combined check.")
     parser.add_argument("--model", type=str, default="gpt-4.1-mini",
                         help="The OpenAI model to use as the judge.")
+    parser.add_argument("--run_name", type=str, default=None,
+                        help="The name of the directory to save results in.")
+    parser.add_argument("--test", action="store_true",
+                        help="Run in test mode with fake results (no API calls).")
     args = parser.parse_args()
 
     base_save_dir = PROJECT_ROOT / "linear_probe" / "not_detected_vs_detected_correct" / "validation_llm_judges_runs"
-    save_root, log_file = setup_logging(base_save_dir)
+    save_root, log_file = setup_logging(base_save_dir, run_name=args.run_name)
     
     print(f"\n{'='*70}")
     print(f"VALIDATING LLM JUDGES (Mode: {args.mode})")
@@ -218,7 +224,17 @@ def main():
         print(f"  Response: {response[:100]}...")
 
         # 1 & 2. Affirmative and Internality Checks (only if coherent)
-        if args.mode == "combined":
+        if args.test:
+            # Fake results for testing plotting
+            is_coherent = True
+            t_coherence = 0.01
+            affirm_res = (i % 2 == 0) or (gt_affirm) # mostly pass
+            t_affirm = 0.01
+            unknown_res = True
+            t_unknown = 0.01
+            internal_res = (i % 3 != 0) or (gt_internal) # mostly pass
+            t_internal = 0.01
+        elif args.mode == "combined":
             affirm_res, t_affirm, internal_res, t_internal, is_coherent, t_coherence, unknown_res, t_unknown = run_combined_check(response, concept, model=args.model)
         else:
             affirm_res, t_affirm, internal_res, t_internal, is_coherent, t_coherence, unknown_res, t_unknown = run_affirmative_and_internal_checks(response, concept, model=args.model)
@@ -242,9 +258,14 @@ def main():
         else:
             # 3. Full Classification (only run if detector successfully identifies a specific concept)
             if affirm_res and internal_res:
-                t0 = time.time()
-                category_res = classify_response(response, concept, model=args.model)
-                t_category = time.time() - t0
+                if args.test:
+                    # Deterministic fake classification logic
+                    category_res = gt_category if (i % 5 != 0) else "detected_orthogonal"
+                    t_category = 0.01
+                else:
+                    t0 = time.time()
+                    category_res = classify_response(response, concept, model=args.model)
+                    t_category = time.time() - t0
         
         internal_match = (internal_res == gt_internal)
         if internal_match: overall_correct_internal += 1
