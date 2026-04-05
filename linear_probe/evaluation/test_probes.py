@@ -42,6 +42,7 @@ def parse_probe_name(filename):
         
     return metadata
 
+def main():
     icons = {
         "not_detected": "⚫",
         "detected_opposite": "🔴",
@@ -52,8 +53,6 @@ def parse_probe_name(filename):
         "incoherent": "💀",
         "false_positive" : "❌",
     }
-
-def main():
     parser = argparse.ArgumentParser(description="Evaluate Introspection Probes (FPR and Steer Rate)")
     parser.add_argument("--model", type=str, default="meta-llama/Meta-Llama-3.1-8B-Instruct")
     parser.add_argument("--dataset", type=str, default="brysbaert_abstract_nouns.json")
@@ -145,14 +144,13 @@ def main():
             else:
                 injection_start_token = None
             
-            for p_coeff in args.probe_coeffs:
-                print(f"  ▶ Coefficient: {p_coeff}")
-                
-                # --- A. Measure False Positive Rate (Probe only, No Steer) ---
-                # Run once per probe/coeff as a baseline
-                baseline_concept = list(concept_vectors_dict.keys())[0]
-                if baseline_concept in concept_vectors_dict:
-                    _, baseline_steering_vector = concept_vectors_dict[baseline_concept]
+            # --- A. Measure False Positive Rate (Probe only, No Steer) ---
+            # Run once per probe/coeff as a baseline before the main concept loop
+            print(f"  🔍 Measuring FPR baselines for all coefficients...")
+            baseline_concept = list(concept_vectors_dict.keys())[0]
+            if baseline_concept in concept_vectors_dict:
+                _, baseline_steering_vector = concept_vectors_dict[baseline_concept]
+                for p_coeff in args.probe_coeffs:
                     fpr_response, _ = inject_concept_vector_and_probe(
                         model=model,
                         tokenizer=tokenizer,
@@ -168,19 +166,27 @@ def main():
                         max_new_tokens=30
                     )
                     fpr_cat = classify_response(fpr_response, baseline_concept)
-                    if fpr_cat not in ["not_detected", "incoherent"]:
+                    is_fp = fpr_cat not in ["not_detected", "incoherent"]
+                    if is_fp:
                         results[probe_name][prompt_name][p_coeff]["fpr_hits"] += 1
                     results[probe_name][prompt_name][p_coeff]["fpr_total"] = 1
+                    
+                    icon = icons.get("false_positive" if is_fp else "not_detected", "❓")
+                    print(f"    Coeff {p_coeff:5.1f} | FPR Check | {icon} Category: {fpr_cat}")
+                    print("Model Response")
+                    print(fpr_response)
 
-                for concept in tqdm(concepts, desc=f"    Probing"):
-                    # Get the pre-computed steering vector for this concept
-                    if concept not in concept_vectors_dict:
-                        print(f"⚠️  Concept '{concept}' not found in pre-computed vectors. Skipping.")
-                        continue
-                    # compute_concept_vector returns (last_token_vec, avg_vec)
-                    _, steering_vector = concept_vectors_dict[concept]
-
-                    # --- B. Measure Steering Rate (Concept + Probe) ---
+            # --- B. Measure Steering Rate (Concept + Probe) ---
+            for concept in tqdm(concepts, desc=f"    Probing"):
+                # Get the pre-computed steering vector for this concept
+                if concept not in concept_vectors_dict:
+                    print(f"⚠️  Concept '{concept}' not found in pre-computed vectors. Skipping.")
+                    continue
+                # compute_concept_vector returns (last_token_vec, avg_vec)
+                _, steering_vector = concept_vectors_dict[concept]
+                
+                print(f"\n    📝 Concept: {concept}")
+                for p_coeff in args.probe_coeffs:
                     steer_response, _ = inject_concept_vector_and_probe(
                         model=model,
                         tokenizer=tokenizer,
@@ -196,20 +202,25 @@ def main():
                         max_new_tokens=30
                     )
                     
-                    print(f"    Concept : {concept} | Concept Coeff: {args.concept_coeff} | Response: {steer_response}")
-                    
                     steer_cat = classify_response(steer_response, concept)
                     if steer_cat == "detected_correct":
                         results[probe_name][prompt_name][p_coeff]["steer_hits"] += 1
                     
+                    icon = icons.get(steer_cat, "❓")
+                    print(f"      {icon} Coeff: {p_coeff:5.1f} | Category: {steer_cat:18}.")
+                    print("Model Response")
+                    print(steer_response)
+                    
                     results[probe_name][prompt_name][p_coeff]["total"] += 1
 
-                # Intermediate printing
+            # Final prompt summary printing
+            print(f"\n    📊 Final Summary for {prompt_name}:")
+            for p_coeff in args.probe_coeffs:
                 total = results[probe_name][prompt_name][p_coeff]["total"]
                 fpr_total = results[probe_name][prompt_name][p_coeff].get("fpr_total", 0)
                 fpr = (results[probe_name][prompt_name][p_coeff]["fpr_hits"] / fpr_total) * 100 if fpr_total > 0 else 0
                 sr = (results[probe_name][prompt_name][p_coeff]["steer_hits"] / total) * 100 if total > 0 else 0
-                print(f"    ⭐ FPR: {fpr:5.1f}% | Steer Rate: {sr:5.1f}%")
+                print(f"      ▶ Coeff {p_coeff:5.1f} | FPR: {fpr:5.1f}% | Steer Rate: {sr:5.1f}%")
 
     # 6. Final Summary Export
     summary_file = save_root / "final_evaluation_summary.csv"
