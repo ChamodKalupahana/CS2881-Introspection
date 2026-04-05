@@ -2,7 +2,7 @@ import os
 from typing import Optional
 from dotenv import load_dotenv
 from openai import OpenAI
-from original_paper.all_prompts import coherence_prompt, thinking_about_word_prompt, affirmative_response_prompt, affirmative_response_followed_by_correct_identification_prompt, mcq_correct_prompt, injection_strength_correct_prompt, internality_prompt
+from original_paper.all_prompts import coherence_prompt, thinking_about_word_prompt, affirmative_response_prompt, affirmative_response_followed_by_correct_identification_prompt, mcq_correct_prompt, injection_strength_correct_prompt, internality_prompt, unknown_detection_prompt
 
 load_dotenv()
 
@@ -13,7 +13,7 @@ if not api_key:
 
 # based on the 'grader prompts' section of introspection paper (https://transformer-circuits.pub/2025/introspection/index.html)
 client = OpenAI()  # Automatically reads OPENAI_API_KEY from environment
-def query_llm_judge(question = None, response = None, word = None, grading_type = None, options_text = None, correct_letter = None, expected_category = None) -> Optional[bool]:
+def query_llm_judge(question = None, response = None, word = None, grading_type = None, options_text = None, correct_letter = None, expected_category = None, model = "gpt-4.1-mini") -> Optional[bool]:
     if grading_type == "coherence":
         prompt = coherence_prompt.format(prompt=question, response=response)
     elif grading_type == "thinking_about_word":
@@ -28,13 +28,15 @@ def query_llm_judge(question = None, response = None, word = None, grading_type 
         prompt = injection_strength_correct_prompt.format(expected_category=expected_category, response=response)
     elif grading_type == "internality":
         prompt = internality_prompt.format(target_concept=word, model_response=response)
+    elif grading_type == "unknown_detection_prompt":
+        prompt = unknown_detection_prompt.format(response=response)
     try: 
         completion = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model=model,
             messages=[{"role": "user", "content": prompt}]
         )
         judge_response_text = completion.choices[0].message.content
-        print("\n    [Judge Affirmative Check]:")
+        print(f"\n    [Judge Check: {grading_type}]:")
         for line in judge_response_text.split("\n"):
             print(f"      {line}")
     except Exception as e:
