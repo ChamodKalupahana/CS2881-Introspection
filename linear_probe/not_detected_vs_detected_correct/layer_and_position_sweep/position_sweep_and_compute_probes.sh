@@ -14,7 +14,6 @@ python save_activations_by_layer_and_position.py \
     --dataset brysbaert_abstract_nouns.json \
     --layer 14 \
     --coeff 5.0 \
-    --coeff 5.0 \
     --vector_type average \
     --max_new_tokens 50 \
     --run_name "${RUN_NAME}" \

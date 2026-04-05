@@ -83,7 +83,8 @@ def main():
         "detected_correct",
         "detected_unknown",
         "incoherent",
-        "calibration_correct"
+        "calibration_correct",
+        "calibration_parallel"
     ]
     
     save_root, log_file = setup_logging(
@@ -100,7 +101,8 @@ def main():
         "detected_correct": "🟢",
         "detected_unknown": "❓",
         "incoherent": "💀",
-        "calibration_correct" : "👍"
+        "calibration_correct" : "👍",
+        "calibration_parallel" : "📐"
     }
 
     # Initialize stats
@@ -165,8 +167,15 @@ def main():
             # Categorize Output
             category = classify_response(response, concept, model=args.judge_mode)
             
-            if category == "detected_correct":
-                # If detected, run again WITHOUT injection to capture 'calibration_correct' baseline
+            if category in ["detected_correct", "detected_parallel"]:
+                # Mapping target categories to their calibration baseline folders
+                calib_mapping = {
+                    "detected_correct": "calibration_correct",
+                    "detected_parallel": "calibration_parallel"
+                }
+                calib_cat = calib_mapping[category]
+
+                # If detected, run again WITHOUT injection to capture the baseline
                 calibation_response, calibation_activations_dict = capture_calibation_correct_unified(
                     model=model,
                     tokenizer=tokenizer,
@@ -180,18 +189,18 @@ def main():
 
                 if not args.no_save:
                     # Save the clean (non-steered) activations
-                    save_path = save_root / "calibration_correct" / f"{concept}_c{args.coeff}_l{args.layer}_v{args.vector_type}.pt"
+                    save_path = save_root / calib_cat / f"{concept}_c{args.coeff}_l{args.layer}_v{args.vector_type}.pt"
                     torch.save(calibation_activations_dict, save_path)
                     
                     # Also save the steered activations separately for comparison
-                    steer_save_path = save_root / "detected_correct" / f"{concept}_c{args.coeff}_l{args.layer}_v{args.vector_type}.pt"
+                    steer_save_path = save_root / category / f"{concept}_c{args.coeff}_l{args.layer}_v{args.vector_type}.pt"
                     torch.save(activations_dict, steer_save_path)
 
             stats[category] += 1
             icon = icons.get(category, "⚪")
             
             # Save activations (only for remaining categories, or if not already saved via calibration block)
-            if not args.no_save and category != "detected_correct":
+            if not args.no_save and category not in ["detected_correct", "detected_parallel"]:
                 save_path = save_root / category / f"{concept}_c{args.coeff}_l{args.layer}_v{args.vector_type}.pt"
                 torch.save(activations_dict, save_path)
             
