@@ -108,6 +108,7 @@ def get_category_tensors(activations):
 def plot_discriminability_scatter(results, save_path):
     """
     Creates a scatter plot comparing primary vs validation discriminability scores.
+    Styled after test_probe_dir_to_ground_truth.py.
     """
     mm_scores = results["mass_mean_d_scores"]
     mm_val_scores = results["mass_mean_val_d_scores"]
@@ -116,39 +117,50 @@ def plot_discriminability_scatter(results, save_path):
     
     plt.figure(figsize=(14, 10))
     
-    # 1. Collect and Plot Mass-Mean points
+    # 1. Plot Mass-Mean Vectors (Blue circles)
     mm_x = []
     mm_y = []
+    mm_labels = []
     for (layer, pos), score in mm_scores.items():
         mm_x.append(score)
-        mm_y.append(mm_val_scores[(layer, pos)])
-        # Optional: Annotate only if one of the scores is significant
-        if score > 1.5 or mm_val_scores[(layer, pos)] > 1.5:
-             plt.annotate(f"MM L{layer} P{pos}", (score, mm_val_scores[(layer, pos)]), 
-                          fontsize=8, alpha=0.7)
-    
-    plt.scatter(mm_x, mm_y, color='teal', label='Mass-Mean', alpha=0.6, s=50, marker='o')
+        val_score = mm_val_scores[(layer, pos)]
+        mm_y.append(val_score)
+        mm_labels.append(f"L{layer}P{pos}")
+        
+    plt.scatter(mm_x, mm_y, c='blue', alpha=0.8, s=150, label='Mass-Mean Vector', marker='o', edgecolors='black')
 
-    # 2. Collect and Plot PCA points
+    # 2. Plot PCA Components (Red diamonds)
     pca_x = []
     pca_y = []
+    pca_labels = []
     for (layer, pos), scores in pca_scores.items():
         v_scores = pca_val_scores[(layer, pos)]
         for i, (s, vs) in enumerate(zip(scores, v_scores)):
             pca_x.append(s)
             pca_y.append(vs)
-            # Annotate only top PCA components or significant ones
-            if i == 0 and (s > 2.0 or vs > 2.0):
-                plt.annotate(f"PCA{i} L{layer} P{pos}", (s, vs), 
-                             fontsize=7, alpha=0.5)
+            if i == 0: # Only annotate top component or high scores
+                pca_labels.append((s, vs, f"P{i}L{layer}P{pos}"))
 
-    plt.scatter(pca_x, pca_y, color='orange', label='PCA Components', alpha=0.3, s=20, marker='x')
+    plt.scatter(pca_x, pca_y, c='red', alpha=0.6, s=100, label='PCA Components', marker='D', edgecolors='grey')
+
+    # 3. Annotations (Compact styling)
+    # Mass-Mean Labels (Always plot MMV or significant ones)
+    for x, y, label in zip(mm_x, mm_y, mm_labels):
+        if x > 1.2 or y > 1.2:
+            plt.annotate(label, (x, y), textcoords="offset points", xytext=(0, 10), 
+                         ha='center', fontsize=8)
+            
+    # PCA Labels (Only significant ones)
+    for x, y, label in pca_labels:
+        if x > 2.0 or y > 2.0:
+            plt.annotate(label, (x, y), textcoords="offset points", xytext=(0, 10), 
+                         ha='center', fontsize=8)
 
     # Reference Line (y=x)
-    max_val = max(max(mm_x + mm_y + [0.5]), max(pca_x + pca_y + [0.5]))
-    plt.plot([0, max_val], [0, max_val], 'k--', alpha=0.3, label='y=x (Equal Discrim.)')
+    # max_val = max(max(mm_x + mm_y + [0.5]), max(pca_x + pca_y + [0.5]))
+    # plt.plot([0, max_val], [0, max_val], 'k--', alpha=0.3, label='y=x (Equal Discrim.)')
 
-    plt.xlabel("Primary Discriminability (Cohen's d: Parallel vs Not-Detected)")
+    plt.xlabel("Primary Discriminability (Cohen's d: Target vs Not-Detected)")
     plt.ylabel("Validation Discriminability (Cohen's d: Orthogonal vs Not-Detected)")
     plt.title("Discriminability Comparison: Target vs Orthogonal Concepts")
     plt.legend()
@@ -156,13 +168,14 @@ def plot_discriminability_scatter(results, save_path):
     
     plt.tight_layout()
     plt.savefig(save_path)
-    print(f"📊 Discriminability scatter plot saved to: {save_path}")
+    print(f"📊 Styled discriminability scatter plot saved to: {save_path}")
     plt.close()
 
 def main():
     parser = argparse.ArgumentParser(description="Compute Mass-Mean vectors and PCA on saved activations.")
     parser.add_argument("--run_dir", type=str, required=True, help="Path to the saved_activations run directory.")
     parser.add_argument("--n_components", type=int, default=10, help="Number of PCA components to compute per pair.")
+    parser.add_argument("--position", type=int, default=None, help="Optional: specific position to analyze across all layers.")
     args = parser.parse_args()
 
     # 1. Load activations
@@ -218,6 +231,14 @@ def main():
     
     layers = category_tensors["not_detected"]["layers"]
     positions = category_tensors["not_detected"]["positions"]
+    
+    # Optional: Filter by position
+    if args.position is not None:
+        if args.position not in positions:
+            print(f"⚠️  Position {args.position} not found in available positions: {positions}")
+            return
+        positions = [args.position]
+        print(f"📍 Filtering analysis to position: {args.position}")
     
     diff = positive_concept_mean - negative_concept_mean
     
@@ -286,7 +307,8 @@ def main():
     save_dir = PROJECT_ROOT / "plots" / "linear_probe" / "not_detected_vs_detected_correct" / "layer_and_coeff_sweep"
     os.makedirs(save_dir, exist_ok=True)
     
-    plot_name = save_dir / f"{run_id}_discriminability_comparison_PCA.png"
+    pos_suffix = f"_pos{args.position}" if args.position is not None else ""
+    plot_name = save_dir / f"{run_id}_discriminability_comparison_PCA{pos_suffix}.png"
     plot_discriminability_scatter(results, plot_name)
     
     return results

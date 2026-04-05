@@ -10,5 +10,5 @@ python save_activations_by_layer_and_position.py \
     --layer 15 \
     --coeff 9.0
 
-python compute_mass_mean_vectors_and_PCA.py --run_dir saved_activations/run_04_05_26_13_31
+python compute_mass_mean_vectors_and_PCA.py --run_dir saved_activations/run_04_05_26_13_31 --position 0
 python layer_and_position_sweep_mass_mean_vectors.py --run_dir saved_activations/run_04_05_26_13_31
