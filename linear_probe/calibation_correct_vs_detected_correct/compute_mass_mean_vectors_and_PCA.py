@@ -169,8 +169,8 @@ def plot_discriminability_scatter(results, save_path, top_right_only=False):
     else:
         plt.title("Discriminability Comparison: Target vs Orthogonal Concepts")
 
-    plt.xlabel("Primary Discriminability (Cohen's d: Correct vs Not-Detected)")
-    plt.ylabel("Validation Discriminability (Cohen's d: Orthogonal vs Not-Detected)")
+    plt.xlabel("Primary Discriminability (Cohen's d: Detected vs Calibration)")
+    plt.ylabel("Validation Discriminability (Cohen's d: Not-Detected vs Calibration)")
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.5)
     
@@ -204,7 +204,7 @@ def main():
     category_tensors = get_category_tensors(activations)
 
     # Check for required categories
-    required = ["detected_correct", "detected_parallel", "not_detected", "detected_orthogonal"]
+    required = ["detected_correct", "detected_parallel", "calibration_correct", "not_detected"]
     missing = [r for r in required if r not in category_tensors]
     if missing:
         print(f"⚠️  Missing required categories for analysis: {missing}. Found: {list(category_tensors.keys())}")
@@ -212,12 +212,11 @@ def main():
 
     pos_correct = category_tensors["detected_correct"]["tensor"]
     pos_parallel = category_tensors["detected_parallel"]["tensor"]
-    negative = category_tensors["not_detected"]["tensor"]
-    validation = category_tensors["detected_orthogonal"]["tensor"]
+    negative = category_tensors["calibration_correct"]["tensor"]
+    validation = category_tensors["not_detected"]["tensor"]
 
     # Merge positive categories
-    # positive = torch.cat([pos_correct, pos_parallel], dim=0)
-    positive = pos_correct
+    positive = torch.cat([pos_correct, pos_parallel], dim=0)
 
     # 4. Compute concept-wise mean
     print(f"📊 Computing means...")
@@ -240,8 +239,8 @@ def main():
     pca_val_d_scores = {}
     candidates = [] # Top vector candidates
     
-    layers = category_tensors["not_detected"]["layers"]
-    positions = category_tensors["not_detected"]["positions"]
+    layers = category_tensors["calibration_correct"]["layers"]
+    positions = category_tensors["calibration_correct"]["positions"]
     
     # Optional: Filter by position
     if args.position is not None:

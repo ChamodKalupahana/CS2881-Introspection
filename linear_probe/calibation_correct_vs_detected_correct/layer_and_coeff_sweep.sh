@@ -2,7 +2,7 @@
 
 # Configuration
 DATASET="brysbaert_abstract_nouns.json"
-N_SAMPLES=10
+N_SAMPLES=20
 VECTOR_TYPE="average"
 MAX_TOKENS=50
 
@@ -20,7 +20,8 @@ for arg in "$@"; do
     elif [ "$arg" == "--zoomed" ]; then
         MODE="zoomed"
         COEFFS=(3 4 5 6)
-        LAYERS=(10 11 12 13 14 15 16 17 18)
+        # LAYERS=(10 11 12 13 14 15 16 17 18)
+        LAYERS=(12 13 14 15 16)
     fi
 done
 
