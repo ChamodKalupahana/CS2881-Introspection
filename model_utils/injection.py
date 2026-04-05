@@ -252,30 +252,54 @@ def capture_calibation_correct_unified(model, tokenizer, steering_vector, layer_
         inject=inject
     )
 
+def format_for_eval():
+    # 1. Prepare Messages
+    if inject:
+        messages = load_unified_prompt_for_detection()
+    else:
+        messages = load_unified_prompt_for_calibration(calibration_concept)
+    prompt_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    
+    # 2. Calculate injection start token (at "\n\nTrial 1")
+    trial_start_text = "\n\nTrial 1"
+    trial_start_pos = prompt_text.find(trial_start_text)
+    if trial_start_pos != -1:
+        prefix = prompt_text[:trial_start_pos]
+        injection_start_token = len(tokenizer.encode(prefix, add_special_tokens=False))
+    else:
+        injection_start_token = None
+
+
+
 def inject_concept_vector_and_probe(model, tokenizer, steering_vector, layer_to_inject, probe, probe_layer_to_inject, probe_coeff, coeff=5.0, inference_prompt=None, assistant_tokens_only=False, max_new_tokens=20, injection_start_token=None, inject=True):
     """
-    Inject concept vectors and capture activations at layers > layer_to_inject.
-    Positions captured: -6 (end of prompt) to 0 (first generation token).
+    Inject concept vectors (steering) and probe vectors independently,
+    then capture activations at layers downstream of both injections.
     """
     device = next(model.parameters()).device
     
-    # Normalize and prepare steering vector [1, 1, hidden_dim]
-    steering_vector = steering_vector / torch.norm(steering_vector, p=2)
-    if not isinstance(steering_vector, torch.Tensor):
-        steering_vector = torch.tensor(steering_vector, dtype=torch.float32)
-    steering_vector = steering_vector.to(device)
-    if steering_vector.dim() == 1:
-        steering_vector = steering_vector.unsqueeze(0).unsqueeze(0)
-    elif steering_vector.dim() == 2:
-        steering_vector = steering_vector.unsqueeze(0)
+    # 1. Prepare vectors (Normalize and move to device)
+    def prep_vector(v):
+        v = v / (torch.norm(v, p=2) + 1e-9)
+        if not isinstance(v, torch.Tensor):
+            v = torch.tensor(v, dtype=torch.float32)
+        v = v.to(device)
+        if v.dim() == 1:
+            v = v.unsqueeze(0).unsqueeze(0)
+        elif v.dim() == 2:
+            v = v.unsqueeze(0)
+        return v
+    
+    steering_vector = prep_vector(steering_vector)
+    probe = prep_vector(probe)
 
-    # Format Prompt
+    # 2. Format Prompt
     model_type = get_model_type(tokenizer)
     if inference_prompt and ("<|start_header_id|>" in inference_prompt or "<|im_start|>" in inference_prompt):
         prompt = inference_prompt
     else:
         if not inference_prompt:
-            raise ValueError
+            raise ValueError("No inference_prompt provided")
         prompt = format_inference_prompt(model_type, inference_prompt)
     
     inputs = tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(device)
@@ -289,8 +313,9 @@ def inject_concept_vector_and_probe(model, tokenizer, steering_vector, layer_to_
         "gen_captured_layers": set()
     }
 
-    # Register Injection Hook
-    inj_handle = model.model.layers[layer_to_inject].register_forward_hook(
+    # 3. Register Independent Injection Hooks
+    # Handle steering (injectable/toggable)
+    inj_handle_steer = model.model.layers[layer_to_inject].register_forward_hook(
         partial(inject_hook_fn, 
                 steering_vector=steering_vector, 
                 layer_to_inject=layer_to_inject, 
@@ -302,8 +327,8 @@ def inject_concept_vector_and_probe(model, tokenizer, steering_vector, layer_to_
                 inject=inject)
     )
 
-    # Register Probe Injection Hook
-    inj_handle = model.model.layers[layer_to_inject].register_forward_hook(
+    # Handle probe (independently injected, usually always on)
+    inj_handle_probe = model.model.layers[probe_layer_to_inject].register_forward_hook(
         partial(inject_hook_fn, 
                 steering_vector=probe, 
                 layer_to_inject=probe_layer_to_inject,
@@ -311,18 +336,22 @@ def inject_concept_vector_and_probe(model, tokenizer, steering_vector, layer_to_
                 prompt_length=prompt_length, 
                 injection_start_token=injection_start_token, 
                 assistant_tokens_only=assistant_tokens_only,
-                state=state)
+                state=state,
+                inject=True) # Usually probe is always injected in this context
     )
 
-    # Register Capture Hooks for all layers > layer_to_inject
+    # 4. Register Capture Hooks (Layers after BOTH injections)
     cap_handles = []
     num_layers = len(model.model.layers)
-    for i in range(layer_to_inject + 1, num_layers):
+    min_inj_layer = min(layer_to_inject, probe_layer_to_inject)
+    
+    for i in range(min_inj_layer + 1, num_layers):
         h = model.model.layers[i].register_forward_hook(
             partial(capture_hook_fn, layer_idx=i, state=state, prompt_length=prompt_length)
         )
         cap_handles.append(h)
 
+    # 5. Model Execution
     try:
         with torch.no_grad():
             out = model.generate(
@@ -333,8 +362,32 @@ def inject_concept_vector_and_probe(model, tokenizer, steering_vector, layer_to_
                 use_cache=True
             )
     finally:
-        inj_handle.remove()
+        inj_handle_steer.remove()
+        inj_handle_probe.remove()
         for h in cap_handles:
             h.remove()
+
+    # 6. Post-process activations mapping
+    final_activations = {}
+    positions = [-6, -5, -4, -3, -2, -1, 0]
+    
+    for layer_idx, slices in state["activations"].items():
+        if len(slices) == 2:
+            # slices[0] is prompt [-6:-1], slices[1] is generation [0]
+            cat_tensor = torch.cat(slices, dim=1) 
+            for i, pos in enumerate(positions):
+                final_activations[(layer_idx, pos)] = cat_tensor[0, i].detach().cpu()
+        elif len(slices) == 1:
+             tensor = slices[0]
+             if tensor.shape[1] > 1:
+                 for i in range(tensor.shape[1]):
+                     pos = positions[i]
+                     final_activations[(layer_idx, pos)] = tensor[0, i].detach().cpu()
+             else:
+                 final_activations[(layer_idx, 0)] = tensor[0, 0].detach().cpu()
+
+    # 7. Final Output Decoding
+    generated_ids = out[0][prompt_length:]
+    response = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
 
     return response, final_activations

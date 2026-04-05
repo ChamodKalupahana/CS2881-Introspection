@@ -20,3 +20,7 @@ python save_activations_by_layer_and_position_with_calibation.py \
     --coeff 5.0 \
     --vector_type average \
     --max_new_tokens 50
+
+python compute_mass_mean_vectors_and_PCA.py \
+    --run_dir saved_activations/run_04_05_26_21_15 \
+    --position 0

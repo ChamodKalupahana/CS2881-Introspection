@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 
 # Add project root to sys.path
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
@@ -169,8 +169,8 @@ def plot_discriminability_scatter(results, save_path, top_right_only=False):
     else:
         plt.title("Discriminability Comparison: Target vs Orthogonal Concepts")
 
-    plt.xlabel("Primary Discriminability (Cohen's d: Detected vs Calibration)")
-    plt.ylabel("Validation Discriminability (Cohen's d: Not-Detected vs Calibration)")
+    plt.xlabel("Primary Discriminability (Cohen's d: Detected Correct vs Calibration Correct)")
+    plt.ylabel("Validation Discriminability (Cohen's d: Not Detected vs Calibration)")
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.5)
     
@@ -340,7 +340,7 @@ def main():
 
     # 7. Create the 2D plot
     run_id = Path(args.run_dir).name
-    save_dir = PROJECT_ROOT / "plots" / "linear_probe" / "not_detected_vs_detected_correct" / "layer_and_coeff_sweep"
+    save_dir = PROJECT_ROOT / "plots" / "linear_probe" / "calibation_correct_vs_detected_correct" / "layer_and_coeff_sweep"
     os.makedirs(save_dir, exist_ok=True)
     
     pos_suffix = f"_pos{args.position}" if args.position is not None else ""
