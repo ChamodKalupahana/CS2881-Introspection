@@ -7,6 +7,8 @@ from functools import partial
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from linear_probe/calibation_correct_vs_detected_correct/unified_prompts.py import load_unified_prompt_for_detection
+
 # Suppress transformers warnings
 transformers.logging.set_verbosity_error()
 
@@ -210,3 +212,62 @@ def inject_and_capture_anthropic(model, tokenizer, steering_vector, layer_to_inj
         injection_start_token=injection_start_token
     )
 
+def inject_and_capture_unified(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200):
+    """
+    High-level wrapper that implements the Anthropic reproduction 
+    introspection experiment workflow.
+    """
+    # 1. Prepare Messages
+    messages = get_anthropic_reproduce_messages()
+    prompt_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    
+    # 2. Calculate injection start token (at "\n\nTrial 1")
+    trial_start_text = "\n\nTrial 1"
+    trial_start_pos = prompt_text.find(trial_start_text)
+    if trial_start_pos != -1:
+        prefix = prompt_text[:trial_start_pos]
+        injection_start_token = len(tokenizer.encode(prefix, add_special_tokens=False))
+    else:
+        injection_start_token = None
+
+    # 3. Inject and Capture
+    return inject_concept_vector(
+        model=model,
+        tokenizer=tokenizer,
+        steering_vector=steering_vector,
+        layer_to_inject=layer_to_inject,
+        coeff=coeff,
+        inference_prompt=prompt_text,
+        max_new_tokens=max_new_tokens,
+        injection_start_token=injection_start_token
+    )
+
+def capture_calibation_correct_unified(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200):
+    """
+    High-level wrapper that implements the Anthropic reproduction 
+    introspection experiment workflow.
+    """
+    # 1. Prepare Messages
+    messages = load_unified_prompt_for_detection()
+    prompt_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    
+    # 2. Calculate injection start token (at "\n\nTrial 1")
+    trial_start_text = "\n\nTrial 1"
+    trial_start_pos = prompt_text.find(trial_start_text)
+    if trial_start_pos != -1:
+        prefix = prompt_text[:trial_start_pos]
+        injection_start_token = len(tokenizer.encode(prefix, add_special_tokens=False))
+    else:
+        injection_start_token = None
+
+    # 3. Inject and Capture
+    return inject_concept_vector(
+        model=model,
+        tokenizer=tokenizer,
+        steering_vector=steering_vector,
+        layer_to_inject=layer_to_inject,
+        coeff=coeff,
+        inference_prompt=prompt_text,
+        max_new_tokens=max_new_tokens,
+        injection_start_token=injection_start_token
+    )
