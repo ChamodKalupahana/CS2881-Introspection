@@ -218,37 +218,6 @@ def inject_and_capture_anthropic(model, tokenizer, steering_vector, layer_to_inj
         inject=inject
     )
 
-def inject_and_capture_unified(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200, inject=True):
-    """
-    High-level wrapper that implements the Anthropic reproduction 
-    introspection experiment workflow.
-    """
-    # 1. Prepare Messages
-    messages = get_anthropic_reproduce_messages()
-    prompt_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    
-    # 2. Calculate injection start token (at "\n\nTrial 1")
-    trial_start_text = "\n\nTrial 1"
-    trial_start_pos = prompt_text.find(trial_start_text)
-    if trial_start_pos != -1:
-        prefix = prompt_text[:trial_start_pos]
-        injection_start_token = len(tokenizer.encode(prefix, add_special_tokens=False))
-    else:
-        injection_start_token = None
-
-    # 3. Inject and Capture
-    return inject_concept_vector(
-        model=model,
-        tokenizer=tokenizer,
-        steering_vector=steering_vector,
-        layer_to_inject=layer_to_inject,
-        coeff=coeff,
-        inference_prompt=prompt_text,
-        max_new_tokens=max_new_tokens,
-        injection_start_token=injection_start_token,
-        inject=inject
-    )
-
 def capture_calibation_correct_unified(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200, inject=True, calibration_concept : str = "[NONE]"):
     """
     High-level wrapper that implements the Anthropic reproduction 
@@ -282,3 +251,90 @@ def capture_calibation_correct_unified(model, tokenizer, steering_vector, layer_
         injection_start_token=injection_start_token,
         inject=inject
     )
+
+def inject_concept_vector_and_probe(model, tokenizer, steering_vector, layer_to_inject, probe, probe_layer_to_inject, probe_coeff, coeff=5.0, inference_prompt=None, assistant_tokens_only=False, max_new_tokens=20, injection_start_token=None, inject=True):
+    """
+    Inject concept vectors and capture activations at layers > layer_to_inject.
+    Positions captured: -6 (end of prompt) to 0 (first generation token).
+    """
+    device = next(model.parameters()).device
+    
+    # Normalize and prepare steering vector [1, 1, hidden_dim]
+    steering_vector = steering_vector / torch.norm(steering_vector, p=2)
+    if not isinstance(steering_vector, torch.Tensor):
+        steering_vector = torch.tensor(steering_vector, dtype=torch.float32)
+    steering_vector = steering_vector.to(device)
+    if steering_vector.dim() == 1:
+        steering_vector = steering_vector.unsqueeze(0).unsqueeze(0)
+    elif steering_vector.dim() == 2:
+        steering_vector = steering_vector.unsqueeze(0)
+
+    # Format Prompt
+    model_type = get_model_type(tokenizer)
+    if inference_prompt and ("<|start_header_id|>" in inference_prompt or "<|im_start|>" in inference_prompt):
+        prompt = inference_prompt
+    else:
+        if not inference_prompt:
+            raise ValueError
+        prompt = format_inference_prompt(model_type, inference_prompt)
+    
+    inputs = tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(device)
+    prompt_length = inputs.input_ids.shape[1]
+    
+    # Shared execution state
+    state = {
+        "prompt_processed": False,
+        "activations": defaultdict(list),
+        "prompt_captured_layers": set(),
+        "gen_captured_layers": set()
+    }
+
+    # Register Injection Hook
+    inj_handle = model.model.layers[layer_to_inject].register_forward_hook(
+        partial(inject_hook_fn, 
+                steering_vector=steering_vector, 
+                layer_to_inject=layer_to_inject, 
+                coeff=coeff, 
+                prompt_length=prompt_length, 
+                injection_start_token=injection_start_token, 
+                assistant_tokens_only=assistant_tokens_only,
+                state=state,
+                inject=inject)
+    )
+
+    # Register Probe Injection Hook
+    inj_handle = model.model.layers[layer_to_inject].register_forward_hook(
+        partial(inject_hook_fn, 
+                steering_vector=probe, 
+                layer_to_inject=probe_layer_to_inject,
+                coeff=probe_coeff, 
+                prompt_length=prompt_length, 
+                injection_start_token=injection_start_token, 
+                assistant_tokens_only=assistant_tokens_only,
+                state=state)
+    )
+
+    # Register Capture Hooks for all layers > layer_to_inject
+    cap_handles = []
+    num_layers = len(model.model.layers)
+    for i in range(layer_to_inject + 1, num_layers):
+        h = model.model.layers[i].register_forward_hook(
+            partial(capture_hook_fn, layer_idx=i, state=state, prompt_length=prompt_length)
+        )
+        cap_handles.append(h)
+
+    try:
+        with torch.no_grad():
+            out = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                pad_token_id=tokenizer.eos_token_id,
+                use_cache=True
+            )
+    finally:
+        inj_handle.remove()
+        for h in cap_handles:
+            h.remove()
+
+    return response, final_activations

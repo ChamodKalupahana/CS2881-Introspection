@@ -353,7 +353,7 @@ def main():
     candidates.sort(key=lambda x: x['score'], reverse=True)
     top_5 = candidates[:5]
     
-    probe_vectors_dir = Path(__file__).parent / "probe_vectors" / run_id
+    probe_vectors_dir = Path(__file__).parent / "probe_vectors"
     os.makedirs(probe_vectors_dir, exist_ok=True)
     
     for i, item in enumerate(top_5):
