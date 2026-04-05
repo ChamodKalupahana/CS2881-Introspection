@@ -105,7 +105,7 @@ def get_category_tensors(activations):
     print(f"{'='*30}\n")
     return category_tensors
 
-def plot_discriminability_scatter(results, save_path):
+def plot_discriminability_scatter(results, save_path, top_right_only=False):
     """
     Creates a scatter plot comparing primary vs validation discriminability scores.
     Styled after test_probe_dir_to_ground_truth.py.
@@ -156,13 +156,21 @@ def plot_discriminability_scatter(results, save_path):
             plt.annotate(label, (x, y), textcoords="offset points", xytext=(0, 10), 
                          ha='center', fontsize=8)
 
-    # Reference Line (y=x)
-    # max_val = max(max(mm_x + mm_y + [0.5]), max(pca_x + pca_y + [0.5]))
-    # plt.plot([0, max_val], [0, max_val], 'k--', alpha=0.3, label='y=x (Equal Discrim.)')
+    if top_right_only:
+        # Calculate max values for axis scaling
+        all_x = mm_x + pca_x
+        all_y = mm_y + pca_y
+        max_val = max(all_x + all_y + [1.5])
+        
+        # Focus on the highly discriminative cluster
+        plt.xlim(0.8, max_val + 0.1)
+        plt.ylim(0.5, max(all_y + [1.0]) + 0.1)
+        plt.title("Discriminability Comparison: Top-Right Cluster (High Separation)")
+    else:
+        plt.title("Discriminability Comparison: Target vs Orthogonal Concepts")
 
     plt.xlabel("Primary Discriminability (Cohen's d: Target vs Not-Detected)")
     plt.ylabel("Validation Discriminability (Cohen's d: Orthogonal vs Not-Detected)")
-    plt.title("Discriminability Comparison: Target vs Orthogonal Concepts")
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.5)
     
@@ -176,6 +184,7 @@ def main():
     parser.add_argument("--run_dir", type=str, required=True, help="Path to the saved_activations run directory.")
     parser.add_argument("--n_components", type=int, default=10, help="Number of PCA components to compute per pair.")
     parser.add_argument("--position", type=int, default=None, help="Optional: specific position to analyze across all layers.")
+    parser.add_argument("--top_right_only", action="store_true", help="Plot only the top-right cluster (highly discriminative directions).")
     args = parser.parse_args()
 
     # 1. Load activations
@@ -228,6 +237,7 @@ def main():
     pca_d_scores = {}
     mass_mean_val_d_scores = {}
     pca_val_d_scores = {}
+    candidates = [] # Top vector candidates
     
     layers = category_tensors["not_detected"]["layers"]
     positions = category_tensors["not_detected"]["positions"]
@@ -264,7 +274,20 @@ def main():
             
             # Mass-mean Cohen's d (Validation)
             val_mm_projs = val_dist @ unit_mm
-            mass_mean_val_d_scores[(layer, position)] = compute_cohens_d(val_mm_projs, neg_mm_projs)
+            mm_val_d = compute_cohens_d(val_mm_projs, neg_mm_projs)
+            mass_mean_val_d_scores[(layer, position)] = mm_val_d
+            
+            # Record Candidate
+            mm_score = np.sqrt(mass_mean_d_scores[(layer, position)]**2 + mm_val_d**2)
+            candidates.append({
+                'type': 'MM',
+                'layer': layer,
+                'pos': position,
+                'vector': mm_vec,
+                'score': mm_score,
+                'd_prim': mass_mean_d_scores[(layer, position)],
+                'd_val': mm_val_d
+            })
             
             # 3. PCA
             pca = PCA(n_components=args.n_components)
@@ -285,7 +308,20 @@ def main():
                 
                 # Validation
                 v_projs = val_dist @ unit_comp
-                p_val_d_scores.append(compute_cohens_d(v_projs, n_projs))
+                val_d = compute_cohens_d(v_projs, n_projs)
+                p_val_d_scores.append(val_d)
+                
+                # Record Candidate
+                p_score = np.sqrt(p_d_scores[-1]**2 + val_d**2)
+                candidates.append({
+                    'type': f'PCA{comp_idx}',
+                    'layer': layer,
+                    'pos': position,
+                    'vector': component,
+                    'score': p_score,
+                    'd_prim': p_d_scores[-1],
+                    'd_val': val_d
+                })
                     
             pca_d_scores[(layer, position)] = p_d_scores
             pca_val_d_scores[(layer, position)] = p_val_d_scores
@@ -308,9 +344,25 @@ def main():
     os.makedirs(save_dir, exist_ok=True)
     
     pos_suffix = f"_pos{args.position}" if args.position is not None else ""
-    plot_name = save_dir / f"{run_id}_discriminability_comparison_PCA{pos_suffix}.png"
-    plot_discriminability_scatter(results, plot_name)
+    top_right_suffix = "_top_right" if args.top_right_only else ""
+    plot_name = save_dir / f"{run_id}_discriminability_comparison_PCA{pos_suffix}{top_right_suffix}.png"
+    plot_discriminability_scatter(results, plot_name, top_right_only=args.top_right_only)
     
+    # 8. Save Top 5 Vectors
+    print(f"\n🏅 Saving Top 5 most discriminative vectors...")
+    candidates.sort(key=lambda x: x['score'], reverse=True)
+    top_5 = candidates[:5]
+    
+    probe_vectors_dir = Path(__file__).parent / "probe_vectors" / run_id
+    os.makedirs(probe_vectors_dir, exist_ok=True)
+    
+    for i, item in enumerate(top_5):
+        # Precise naming with scores
+        filename = f"{item['type']}_L{item['layer']}_P{item['pos']}_dPrim{item['d_prim']:.2f}_dVal{item['d_val']:.2f}.pt"
+        vector_tensor = torch.tensor(item['vector'], dtype=torch.float32)
+        torch.save(vector_tensor, probe_vectors_dir / filename)
+        print(f"  ⭐ Saved {item['type']} (Rank {i+1}, Score {item['score']:.2f}) -> {filename}")
+        
     return results
     
 

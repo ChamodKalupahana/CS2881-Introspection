@@ -65,3 +65,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     validate_anthropic_injection(args.model, args.layer, args.coeff)
+
+    """
+    python validate_injecting_concepts.py \
+    --layer 15 \
+    --coeff 9.0
+
+    """
