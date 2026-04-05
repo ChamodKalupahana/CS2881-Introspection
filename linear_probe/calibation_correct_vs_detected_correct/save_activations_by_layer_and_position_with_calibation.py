@@ -10,13 +10,13 @@ from collections import defaultdict
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Add project root to sys.path
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
 # Internal project imports
 from original_paper.compute_concept_vector_utils import get_data, compute_concept_vector
-from model_utils.injection import inject_and_capture_anthropic
+from model_utils.injection import inject_and_capture_anthropic, capture_calibation_correct_unified
 from model_utils.llm_judges import classify_response
 from model_utils.logging import setup_logging
 
@@ -58,9 +58,6 @@ def print_summary_table(stats, detection_categories, total_samples, icons):
         print(f"  ❌ Errors              : {stats['error']:3}")
     print(f"{'='*70}")
 
-def handle_calibation_correct():
-
-
 def main():
     parser = argparse.ArgumentParser(description="Sweep concepts, inject vectors, and save activations by category.")
     parser.add_argument("--model", type=str, default="meta-llama/Meta-Llama-3-8B-Instruct", help="Local model to run.")
@@ -85,7 +82,8 @@ def main():
         "detected_parallel",
         "detected_correct",
         "detected_unknown",
-        "incoherent"
+        "incoherent",
+        "calibration_correct"
     ]
     
     save_root, log_file = setup_logging(
@@ -102,6 +100,7 @@ def main():
         "detected_correct": "🟢",
         "detected_unknown": "❓",
         "incoherent": "💀",
+        "calibration_correct" : "👍"
     }
 
     # Initialize stats
@@ -167,13 +166,32 @@ def main():
             category = classify_response(response, concept, model=args.judge_mode)
             
             if category == "detected_correct":
-                
+                # If detected, run again WITHOUT injection to capture 'calibration_correct' baseline
+                calibation_response, calibation_activations_dict = capture_calibation_correct_unified(
+                    model=model,
+                    tokenizer=tokenizer,
+                    steering_vector=steering_vector,
+                    layer_to_inject=args.layer,
+                    coeff=args.coeff,
+                    max_new_tokens=args.max_new_tokens,
+                    inject=False,
+                    calibration_concept=concept
+                )
+
+                if not args.no_save:
+                    # Save the clean (non-steered) activations
+                    save_path = save_root / "calibration_correct" / f"{concept}_c{args.coeff}_l{args.layer}_v{args.vector_type}.pt"
+                    torch.save(calibation_activations_dict, save_path)
+                    
+                    # Also save the steered activations separately for comparison
+                    steer_save_path = save_root / "detected_correct" / f"{concept}_c{args.coeff}_l{args.layer}_v{args.vector_type}.pt"
+                    torch.save(activations_dict, steer_save_path)
 
             stats[category] += 1
             icon = icons.get(category, "⚪")
             
-            # Save activations
-            if not args.no_save:
+            # Save activations (only for remaining categories, or if not already saved via calibration block)
+            if not args.no_save and category != "detected_correct":
                 save_path = save_root / category / f"{concept}_c{args.coeff}_l{args.layer}_v{args.vector_type}.pt"
                 torch.save(activations_dict, save_path)
             

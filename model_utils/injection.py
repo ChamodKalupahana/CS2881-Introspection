@@ -7,7 +7,7 @@ from functools import partial
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from linear_probe/calibation_correct_vs_detected_correct/unified_prompts.py import load_unified_prompt_for_detection
+from linear_probe.calibation_correct_vs_detected_correct.unified_prompts import load_unified_prompt_for_detection, load_unified_prompt_for_calibration
 
 # Suppress transformers warnings
 transformers.logging.set_verbosity_error()
@@ -22,7 +22,7 @@ from original_paper.inject_concept_vector import get_model_type, format_inferenc
 
 # ── Injection + activation capture ───────────────────────────────────────────
 
-def inject_hook_fn(module, input, output, state, steering_vector, layer_to_inject, coeff, prompt_length, injection_start_token, assistant_tokens_only):
+def inject_hook_fn(module, input, output, state, steering_vector, layer_to_inject, coeff, prompt_length, injection_start_token, assistant_tokens_only, inject=True):
     """
     Handles the injection of the steering vector into the residual stream.
     """
@@ -54,7 +54,11 @@ def inject_hook_fn(module, input, output, state, steering_vector, layer_to_injec
         if seq_len == 1:
             steer_expanded = steer
 
-    modified = hidden_states + coeff * steer_expanded
+    if inject:
+        modified = hidden_states + coeff * steer_expanded
+    else:
+        modified = hidden_states
+        
     return (modified,) + output[1:] if isinstance(output, tuple) else modified
 
 def capture_hook_fn(module, input, output, layer_idx, state, prompt_length, start_position : int = -6):
@@ -80,7 +84,7 @@ def capture_hook_fn(module, input, output, layer_idx, state, prompt_length, star
 
     return output
 
-def inject_concept_vector(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, inference_prompt=None, assistant_tokens_only=False, max_new_tokens=20, injection_start_token=None):
+def inject_concept_vector(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, inference_prompt=None, assistant_tokens_only=False, max_new_tokens=20, injection_start_token=None, inject=True):
     """
     Inject concept vectors and capture activations at layers > layer_to_inject.
     Positions captured: -6 (end of prompt) to 0 (first generation token).
@@ -126,7 +130,8 @@ def inject_concept_vector(model, tokenizer, steering_vector, layer_to_inject, co
                 prompt_length=prompt_length, 
                 injection_start_token=injection_start_token, 
                 assistant_tokens_only=assistant_tokens_only,
-                state=state)
+                state=state,
+                inject=inject)
     )
 
     # Register Capture Hooks for all layers > layer_to_inject
@@ -182,7 +187,7 @@ def inject_concept_vector(model, tokenizer, steering_vector, layer_to_inject, co
 
     return response, final_activations
 
-def inject_and_capture_anthropic(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200):
+def inject_and_capture_anthropic(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200, inject=True):
     """
     High-level wrapper that implements the Anthropic reproduction 
     introspection experiment workflow.
@@ -209,10 +214,11 @@ def inject_and_capture_anthropic(model, tokenizer, steering_vector, layer_to_inj
         coeff=coeff,
         inference_prompt=prompt_text,
         max_new_tokens=max_new_tokens,
-        injection_start_token=injection_start_token
+        injection_start_token=injection_start_token,
+        inject=inject
     )
 
-def inject_and_capture_unified(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200):
+def inject_and_capture_unified(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200, inject=True):
     """
     High-level wrapper that implements the Anthropic reproduction 
     introspection experiment workflow.
@@ -239,16 +245,20 @@ def inject_and_capture_unified(model, tokenizer, steering_vector, layer_to_injec
         coeff=coeff,
         inference_prompt=prompt_text,
         max_new_tokens=max_new_tokens,
-        injection_start_token=injection_start_token
+        injection_start_token=injection_start_token,
+        inject=inject
     )
 
-def capture_calibation_correct_unified(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200):
+def capture_calibation_correct_unified(model, tokenizer, steering_vector, layer_to_inject, coeff=12.0, max_new_tokens=200, inject=True, calibration_concept : str = "[NONE]"):
     """
     High-level wrapper that implements the Anthropic reproduction 
     introspection experiment workflow.
     """
     # 1. Prepare Messages
-    messages = load_unified_prompt_for_detection()
+    if inject:
+        messages = load_unified_prompt_for_detection()
+    else:
+        messages = load_unified_prompt_for_calibration(calibration_concept)
     prompt_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     
     # 2. Calculate injection start token (at "\n\nTrial 1")
@@ -269,5 +279,6 @@ def capture_calibation_correct_unified(model, tokenizer, steering_vector, layer_
         coeff=coeff,
         inference_prompt=prompt_text,
         max_new_tokens=max_new_tokens,
-        injection_start_token=injection_start_token
+        injection_start_token=injection_start_token,
+        inject=inject
     )
