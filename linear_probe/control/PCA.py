@@ -112,6 +112,7 @@ def extract_PCA_from_activations_cohens_d(positive_data: dict, negative_data: di
         neg_dist = negative_data[l].detach().cpu().float().numpy()
         
         # PCA on concatenated data
+        # TODO: move to mass mean vector
         X = np.concatenate([pos_dist, neg_dist], axis=0)
         
         pca = PCA(n_components=num_components)
