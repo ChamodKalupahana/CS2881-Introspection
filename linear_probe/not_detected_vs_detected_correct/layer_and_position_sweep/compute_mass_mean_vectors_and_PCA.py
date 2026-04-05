@@ -125,7 +125,7 @@ def plot_discriminability_scatter(results, save_path, top_right_only=False):
         mm_x.append(score)
         val_score = mm_val_scores[(layer, pos)]
         mm_y.append(val_score)
-        mm_labels.append(f"L{layer}P{pos}")
+        mm_labels.append(f"L{layer}")
         
     plt.scatter(mm_x, mm_y, c='blue', alpha=0.8, s=150, label='Mass-Mean Vector', marker='o', edgecolors='black')
 
@@ -139,7 +139,7 @@ def plot_discriminability_scatter(results, save_path, top_right_only=False):
             pca_x.append(s)
             pca_y.append(vs)
             if i == 0: # Only annotate top component or high scores
-                pca_labels.append((s, vs, f"P{i}L{layer}P{pos}"))
+                pca_labels.append((s, vs, f"P{i}L{layer}"))
 
     plt.scatter(pca_x, pca_y, c='red', alpha=0.6, s=100, label='PCA Components', marker='D', edgecolors='grey')
 
@@ -152,7 +152,7 @@ def plot_discriminability_scatter(results, save_path, top_right_only=False):
             
     # PCA Labels (Only significant ones)
     for x, y, label in pca_labels:
-        if x > 2.0 or y > 2.0:
+        if x > 1.0 or y > 1.0:
             plt.annotate(label, (x, y), textcoords="offset points", xytext=(0, 10), 
                          ha='center', fontsize=8)
 
@@ -160,11 +160,11 @@ def plot_discriminability_scatter(results, save_path, top_right_only=False):
         # Calculate max values for axis scaling
         all_x = mm_x + pca_x
         all_y = mm_y + pca_y
-        max_val = max(all_x + all_y + [1.5])
+        max_val = max(all_x + all_y)
         
         # Focus on the highly discriminative cluster
-        plt.xlim(0.8, max_val + 0.1)
-        plt.ylim(0.5, max(all_y + [1.0]) + 0.1)
+        plt.xlim(1.3, 1.71)
+        plt.ylim(1.0, 1.4)
         plt.title("Discriminability Comparison: Top-Right Cluster (High Separation)")
     else:
         plt.title("Discriminability Comparison: Target vs Orthogonal Concepts")
@@ -354,7 +354,7 @@ def main():
     candidates.sort(key=lambda x: x['score'], reverse=True)
     top_5 = candidates[:5]
     
-    probe_vectors_dir = Path(__file__).parent / "probe_vectors" / run_id
+    probe_vectors_dir = Path(__file__).parent / "probe_vectors"
     os.makedirs(probe_vectors_dir, exist_ok=True)
     
     for i, item in enumerate(top_5):

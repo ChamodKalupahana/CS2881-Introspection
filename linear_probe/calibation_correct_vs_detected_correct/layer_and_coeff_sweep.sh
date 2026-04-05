@@ -2,7 +2,7 @@
 
 # Configuration
 DATASET="brysbaert_abstract_nouns.json"
-N_SAMPLES=20
+N_SAMPLES=100
 VECTOR_TYPE="average"
 MAX_TOKENS=50
 
@@ -19,9 +19,9 @@ for arg in "$@"; do
         echo "🛠️  Running in TEST MODE (Fake Data)"
     elif [ "$arg" == "--zoomed" ]; then
         MODE="zoomed"
-        COEFFS=(3 4 5 6)
+        COEFFS=(4 5 6 7)
         # LAYERS=(10 11 12 13 14 15 16 17 18)
-        LAYERS=(12 13 14 15 16)
+        LAYERS=(13 14 15)
     fi
 done
 

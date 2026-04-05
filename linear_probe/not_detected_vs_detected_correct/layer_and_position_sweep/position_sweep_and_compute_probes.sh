@@ -31,3 +31,8 @@ python compute_mass_mean_vectors_and_PCA.py \
     --run_dir "${RUN_DIR}" \
     --position 0 \
     --top_right_only
+
+python compute_mass_mean_vectors_and_PCA.py \
+    --run_dir "saved_activations/run_04_05_26_13_31" \
+    --position 0 \
+    --top_right_only
