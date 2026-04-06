@@ -355,6 +355,14 @@ def main():
     
     probe_vectors_dir = Path(__file__).parent / "probe_vectors"
     os.makedirs(probe_vectors_dir, exist_ok=True)
+
+    # create control vector
+    top_1 = candidates[0]["vector"]
+    control_vector = torch.randn(top_1.shape, dtype=torch.float32)
+    
+    # save with same shape
+    torch.save(control_vector, probe_vectors_dir / "control_random.pt")
+    print(f"  🎲 Saved control_random.pt")
     
     for i, item in enumerate(top_5):
         # Precise naming with scores
