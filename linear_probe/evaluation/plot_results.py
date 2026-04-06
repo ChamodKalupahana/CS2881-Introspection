@@ -47,8 +47,7 @@ def enrich_data(df):
     
     def format_display_name(row):
         m = method_abbr.get(row['Method'], row['Method'][:3].upper())
-        clean_name = row['Probe'].replace("MM_", "").replace(".pt", "")
-        return f"[{m}] {clean_name}"
+        return f"[{m}] Layer {row['Layer_Num']}"
     
     df['Display_Name'] = df.apply(format_display_name, axis=1)
     

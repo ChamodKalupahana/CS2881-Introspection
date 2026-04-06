@@ -37,6 +37,9 @@ DLA/**/*.pt
 PCA/**/*.pt
 linear_probe/**/*.pt
 !linear_probe/control/refusal_control/ground_truth_probe/direction.pt
+!linear_probe/not_detected_vs_detected_correct/layer_and_position_sweep/probe_vectors/*
+!linear_probe/calibation_correct_vs_detected_correct/probe_vectors/*
+
 
 # Plots (can be regenerated)
 # plots/*.png
