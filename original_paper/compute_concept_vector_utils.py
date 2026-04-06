@@ -125,7 +125,7 @@ def compute_concept_vector(model, tokenizer, dataset_name, layer_idx):
             vec_avg = vec_avg.squeeze() # shape [hidden_dim]
             steering_vectors[word] = [vec_last - baseline_mean_last, vec_avg - baseline_mean_avg]
             
-    elif dataset_name in ("complex_data", "test_data"):
+    elif dataset_name in ("complex_data", "test_data", "complex_yes_vector.json"):
         # For each concept: mean(positive) - mean(negative)
         print(f"data keys: {data.keys()}")
         for concept_name in data.keys():

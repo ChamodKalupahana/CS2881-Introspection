@@ -19,9 +19,7 @@ python save_activations_by_layer_and_position_with_calibation.py \
     --run_name "${RUN_NAME}" \
     --n_samples 5
 
-# 4. Perform Detailed PCA Analysis & Vector Export for the best position
-# We focus on --position 0 as it's typically the most discriminative
-echo "🔬 Running Detailed PCA & Probe Export for Position 0..."
-python compute_mass_mean_vectors_and_PCA.py \
-    --run_dir "${RUN_DIR}" \
-    --position 0 \
+python probe_2D_axis.py \
+    --run_dir "${RUN_NAME}" \
+    --probe1  \
+    --probe2  \
