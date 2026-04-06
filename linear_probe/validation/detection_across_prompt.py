@@ -18,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from model_utils.injection import inject_hook_fn
 from original_paper.inject_concept_vector import get_model_type, format_inference_prompt
 from original_paper.all_prompts import get_anthropic_reproduce_messages
+from original_paper.compute_concept_vector_utils import compute_concept_vector
 
 def capture_all_hook_fn(module, input, output, layer_idx, state, prompt_length):
     """
@@ -102,7 +103,6 @@ def inject_concept_vector(model, tokenizer, steering_vector, layer_to_inject, co
             h.remove()
 
     # Post-process activations: Map to {(layer, position): d_model_tensor}
-    # position 0 is the very first token of the prompt.
     final_activations = {}
     
     for layer_idx, slices in state["activations"].items():
@@ -120,42 +120,69 @@ def inject_concept_vector(model, tokenizer, steering_vector, layer_to_inject, co
 
 
 def extract_layer_from_filename(path):
-    """
-    Extracts the layer number (e.g., L14) from a filename using regex.
-    """
-    if path is None:
-        return None
-    name = Path(path).name
-    match = re.search(r"L(\d+)", name)
-    if match:
-        return int(match.group(1))
-    return None
+    if path is None: return None
+    match = re.search(r"L(\d+)", Path(path).name)
+    return int(match.group(1)) if match else None
+
+def resolve_probe_path(probe_path):
+    """Try to find the probe path relative to current dir, project root, or linear_probe/."""
+    path = Path(probe_path)
+    if path.exists(): return path
+    p_root = PROJECT_ROOT / probe_path
+    if p_root.exists(): return p_root
+    p_lp = PROJECT_ROOT / "linear_probe" / probe_path
+    if p_lp.exists(): return p_lp
+    return path
 
 def main():
-    parser = argparse.ArgumentParser(description="Analyze probe detection across prompt positions.")
+    parser = argparse.ArgumentParser(description="Analyze probe detection across prompt positions with dynamic steering.")
     parser.add_argument("--probe1", type=str, required=True, help="Path to the first probe vector.")
-    parser.add_argument("--steering_vector", type=str, required=True, help="Path to the steering vector to inject.")
+    parser.add_argument("--concept", type=str, default="Magnetism", help="Concept from simple_data.json to use for steering.")
+    parser.add_argument("--dataset", type=str, default="simple_data", help="Dataset to load concept from.")
     parser.add_argument("--model", type=str, default="meta-llama/Meta-Llama-3-8B-Instruct", help="Model name.")
     parser.add_argument("--layer", type=int, default=15, help="Layer to inject the steering vector.")
     parser.add_argument("--coeff", type=float, default=12.0, help="Steering coefficient.")
     parser.add_argument("--max_new_tokens", type=int, default=20, help="Tokens to generate.")
     args = parser.parse_args()
 
-    probe_layer = extract_layer_from_filename(args.probe1) 
+    # Load Probe
+    resolved_path = resolve_probe_path(args.probe1)
+    if not resolved_path.exists():
+        print(f"❌ Error: Could not find probe at {args.probe1}")
+        sys.exit(1)
+
+    probe_layer = extract_layer_from_filename(resolved_path) 
     if probe_layer is None:
         print("❌ Error: Could not extract layer from probe filename.")
         sys.exit(1)
 
-    probe = torch.load(args.probe1, map_location='cpu', weights_only=True).float()
-    steering_vec = torch.load(args.steering_vector, map_location='cpu', weights_only=True).float()
+    probe = torch.load(resolved_path, map_location='cpu', weights_only=True).float()
 
     # Load Model
     print(f"⏳ Loading model: {args.model}")
-    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=torch.float16)
+    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=torch.float16, device_map="auto")
     tokenizer = AutoTokenizer.from_pretrained(args.model)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    print(f"✅ Model loaded on {device}\n")
+    print(f"✅ Model loaded\n")
+
+    # Compute Steering Vector on the fly (Concept Magnetism)
+    print(f"🚀 Computing steering vector for '{args.concept}' at layer {args.layer} from '{args.dataset}'...")
+    all_results = compute_concept_vector(model, tokenizer, args.dataset, args.layer)
+    
+    # Extract specific concept vector (using index 1 for average)
+    if args.concept in all_results:
+        steering_vec = all_results[args.concept][1].float().to(model.device)
+    else:
+        # Fallback to case-insensitive check
+        found = False
+        for k in all_results.keys():
+            if k.lower() == args.concept.lower():
+                steering_vec = all_results[k][1].float().to(model.device)
+                args.concept = k
+                found = True
+                break
+        if not found:
+            print(f"❌ Error: Concept '{args.concept}' not found. Available: {list(all_results.keys())}")
+            sys.exit(1)
 
     # Prepare Messages
     messages = get_anthropic_reproduce_messages()
@@ -170,6 +197,7 @@ def main():
         print(f"📍 Detected Trial Start at token index: {injection_start_token}")
     else:
         injection_start_token = None
+        print("⚠️ Warning: Could not detect Trial Start in prompt.")
 
     response, full_activations, all_tokens = inject_concept_vector(
         model=model,
@@ -187,7 +215,6 @@ def main():
     token_labels = []
     for tid in all_tokens:
         label = tokenizer.decode([tid])
-        # Clean labels: convert newlines and replace empty strings
         label = label.replace('\n', '\\n').replace('\r', '\\r')
         if not label.strip():
             label = f"[{tid}]"
@@ -195,7 +222,6 @@ def main():
 
     # Filter activations for the probe's layer and compute projections
     layer_activations = {pos: act for (l, pos), act in full_activations.items() if l == probe_layer}
-    
     positions = sorted(layer_activations.keys())
     projections = []
     
@@ -203,33 +229,47 @@ def main():
     probe_unit = probe.flatten() / (torch.norm(probe.flatten()) + 1e-9)
     
     for pos in positions:
-        act = layer_activations[pos].flatten()
-        # Compute projection (dot product with unit probe)
+        act = layer_activations[pos].flatten().float()
         proj = torch.dot(probe_unit, act)
         projections.append(proj.item())
+
+    # Align sequences to solve length mismatch (e.g. 166 vs 167)
+    num_to_plot = min(len(positions), len(token_labels))
+    positions = positions[:num_to_plot]
+    projections = projections[:num_to_plot]
+    token_labels = token_labels[:num_to_plot]
+    
+    # Ignore the first token position (often BOS or high-variance noise)
+    if len(positions) > 1:
+        positions = positions[1:]
+        projections = projections[1:]
+        token_labels = token_labels[1:]
 
     # Plot
     print(f"📊 Plotting projections for probe at layer {probe_layer}...")
     plt.figure(figsize=(24, 8))
     plt.plot(positions, projections, marker='o', linestyle='-', markersize=4, label='Probe Projection')
     
-    # Reference Line for injection start
     if injection_start_token is not None:
-        plt.axvline(x=injection_start_token, color='red', linestyle='--', alpha=0.7, label='Trial Start (Injection)')
+        # Adjustment: if we truncated, the injection_start_token might need to stay within bounds
+        safe_injection_token = min(injection_start_token, num_to_plot - 1)
+        plt.axvline(x=safe_injection_token, color='red', linestyle='--', alpha=0.7, label=f'Trial Start (Inject: {args.concept})')
     
-    # Labeling
     plt.xticks(positions, token_labels, rotation=90, fontsize=8)
     plt.xlabel('Tokens / Sequence Position')
     plt.ylabel('Dot Product Projection (Unit Probe)')
-    plt.title(f'Probe Detection Across Prompt (Layer {probe_layer}, Steered L{args.layer}, C{args.coeff})')
+    plt.title(f'Probe Detection Across Prompt (Layer {probe_layer}, Concept: {args.concept} @ L{args.layer}, C{args.coeff})')
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.legend()
     
     plt.tight_layout()
-    plot_path = Path("linear_probe/validation/detection_across_prompt.png")
+    # Ensure centralized output relative to project root
+    plot_dir = PROJECT_ROOT / "plots/linear_probe/validation"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plot_path = plot_dir / f"detection_across_prompt_probe_layer{probe_layer}.png"
+    
     plt.savefig(plot_path)
-    print(f"✅ Plot saved to: {plot_path}")
-
+    print(f"✅ Success! Plot saved to: {plot_path}")
     print(f"\n🗣️ Response Captured:\n{'-'*30}\n{response}\n{'-'*30}")
 
 if __name__ == "__main__":
