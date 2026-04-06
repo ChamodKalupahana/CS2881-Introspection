@@ -1,88 +1,46 @@
 import torch
 import argparse
 import sys
+import re
 from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import einops
 import matplotlib.pyplot as plt
 
-def compute_concept_vector(model, tokenizer, dataset_name, layer_idx):
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
+def resolve_probe_path(probe_path):
+    """Try to find the probe path relative to current dir, project root, or linear_probe/."""
+    path = Path(probe_path)
+    if path.exists(): return path
+    p_root = PROJECT_ROOT / probe_path
+    if p_root.exists(): return p_root
+    p_lp = PROJECT_ROOT / "linear_probe" / probe_path
+    if p_lp.exists(): return p_lp
+    return path
+
+def format_token_label(token, idx):
     """
-    Compute steering vectors for all concepts in the dataset
-    
-    Args:
-        model: the model to use
-        tokenizer: the tokenizer to use
-        dataset_name: "simple_data" or "complex_data"
-        layer_idx: the layer index to compute steering vectors for
-        
-    Returns:
-        dict: {concept_name: [prompt_last_steering_vector, prompt_average_steering_vector]}
-        
-    Method:
-        - simple_data: For each word: vector(word) - mean(vector(baseline_word) for all baselines)
-        - complex_data: For each concept: mean(vectors(pos_sentences)) - mean(vectors(neg_sentences))
+    Format token for display, preventing 'tofu' artifacts by adding hex fallbacks
+    for characters likely missing from standard terminal/plot fonts.
     """
-    data = get_data(dataset_name)
-    steering_vectors = {}
+    if not token.strip() or any(ord(c) < 32 for c in token):
+        # Handle whitespace-only or control characters
+        return f"ID[{idx}] (repr: {repr(token)})"
     
-    if dataset_name and (dataset_name.startswith("simple_data") or dataset_name == "abstract_nouns_dataset" or "brysbaert" in dataset_name):
-        concept_words = data["concept_vector_words"]
-        baseline_words = data["baseline_words"]
-        
-        # Compute baseline means once (used for all concepts)
-        print(f"Computing baseline mean from {len(baseline_words)} words...")
-        baseline_vecs_last = []
-        baseline_vecs_avg = []
-        for word in tqdm(baseline_words, desc="Baseline vectors"):
-            vec_last, vec_avg = compute_vector_single_prompt(model, tokenizer, dataset_name, word, layer_idx)
-            baseline_vecs_last.append(vec_last)
-            baseline_vecs_avg.append(vec_avg)
-        baseline_mean_last = torch.stack(baseline_vecs_last, dim=0).mean(dim=0).squeeze() # shape [hidden_dim]
-        baseline_mean_avg = torch.stack(baseline_vecs_avg, dim=0).mean(dim=0).squeeze() # shape [hidden_dim]
-        
-        # Compute steering vectors for each concept word
-        for word in tqdm(concept_words, desc="Concept vectors"):
-            vec_last, vec_avg = compute_vector_single_prompt(model, tokenizer, dataset_name, word, layer_idx)
-            vec_last = vec_last.squeeze() # shape [hidden_dim]
-            vec_avg = vec_avg.squeeze() # shape [hidden_dim]
-            steering_vectors[word] = [vec_last - baseline_mean_last, vec_avg - baseline_mean_avg]
-            
-    elif dataset_name in ("complex_data", "test_data", "complex_yes_vector.json"):
-        # For each concept: mean(positive) - mean(negative)
-        print(f"data keys: {data.keys()}")
-        for concept_name in data.keys():
-            print(f"concept_name: {concept_name}")
-            pos_sentences = data[concept_name][0]  # List of positive examples
-            neg_sentences = data[concept_name][1]  # List of negative examples
-            
-            print(f"\nProcessing {concept_name}: {len(pos_sentences)} pos, {len(neg_sentences)} neg")
-            
-            # Compute mean of positive sentences
-            pos_vecs_last = []
-            pos_vecs_avg = []
-            for sentence in tqdm(pos_sentences, desc=f"{concept_name} (positive)"):
-                vec_last, vec_avg = compute_vector_single_prompt(model, tokenizer, dataset_name, sentence, layer_idx)
-                pos_vecs_last.append(vec_last)
-                pos_vecs_avg.append(vec_avg)
-            pos_mean_last = torch.stack(pos_vecs_last, dim=0).mean(dim=0).squeeze()
-            pos_mean_avg = torch.stack(pos_vecs_avg, dim=0).mean(dim=0).squeeze()
-            
-            # Compute mean of negative sentences
-            neg_vecs_last = []
-            neg_vecs_avg = []
-            for sentence in tqdm(neg_sentences, desc=f"{concept_name} (negative)"):
-                vec_last, vec_avg = compute_vector_single_prompt(model, tokenizer, dataset_name, sentence, layer_idx)
-                neg_vecs_last.append(vec_last)
-                neg_vecs_avg.append(vec_avg)
-            neg_mean_last = torch.stack(neg_vecs_last, dim=0).mean(dim=0).squeeze()
-            neg_mean_avg = torch.stack(neg_vecs_avg, dim=0).mean(dim=0).squeeze()
-            
-            # Steering vectors = positive - negative (both last and avg)
-            steering_vectors[concept_name] = [pos_mean_last - neg_mean_last, pos_mean_avg - neg_mean_avg]
+    display = token.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
     
-    print(f"\nComputed {len(steering_vectors)} steering vectors (each with last and avg variants)")
-    return steering_vectors
+    # Detect CJK or other symbols likely to fail rendering in DejaVu Sans
+    # Threshold 0x2E80 covers CJK radicals, 0xAC00 covers Hangul, etc.
+    needs_hex = any(ord(c) >= 0x2E80 for c in token)
+    if needs_hex:
+        hex_codes = [f"U+{ord(c):04X}" for c in token if ord(c) > 0x7F]
+        return f"{display} ({' '.join(hex_codes)})"
+    
+    return display
 
 def main():
     parser = argparse.ArgumentParser(description="Map a linear probe across the vocabulary using the model's unembedding.")
@@ -90,31 +48,31 @@ def main():
     parser.add_argument("--model", type=str, default="meta-llama/Meta-Llama-3-8B-Instruct", help="Model name.")
     args = parser.parse_args()
 
-    # 1. Load Probe
-    if not Path(args.probe1).exists():
+    # 1. Resolve and Load Probe
+    resolved_path = resolve_probe_path(args.probe1)
+    if not resolved_path.exists():
         print(f"❌ Error: Probe file not found at {args.probe1}")
         sys.exit(1)
         
-    print(f"📡 Loading probe: {args.probe1}")
-    probe = torch.load(args.probe1, map_location='cpu', weights_only=True).float()
+    print(f"📡 Loading probe: {resolved_path}")
+    probe = torch.load(resolved_path, map_location='cpu', weights_only=True).float()
     if probe.dim() > 1:
         probe = probe.flatten()
     
     # 2. Load Model & Tokenizer
     print(f"⏳ Loading model: {args.model}")
-    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=torch.float16)
+    # Using device_map="auto" for efficiency
+    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=torch.float16, device_map="auto")
     tokenizer = AutoTokenizer.from_pretrained(args.model)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    print(f"✅ Model loaded on {device}\n")
+    print(f"✅ Model loaded on {model.device}\n")
 
     # 3. Get Unembedding Matrix (W_U)
     # Shape: [vocab_size, hidden_dim]
     W_U = model.get_output_embeddings().weight.detach() 
     
     # 4. Project Probe into Vocabulary Space
-    # Compute dot product of probe with every token vector in W_U
-    probe = probe.to(device=device, dtype=W_U.dtype)
+    # Ensure probe and W_U are in the same device and dtype to prevent RuntimeError
+    probe = probe.to(device=model.device, dtype=W_U.dtype)
     
     # einsum: probe is [d_model], W_U is [d_vocab, d_model] -> Result is [d_vocab]
     logits = einops.einsum(probe, W_U, "d_model, d_vocab d_model -> d_vocab")
@@ -125,65 +83,72 @@ def main():
     bottom_values, bottom_indices = torch.topk(logits, k=top_k, largest=False)
 
     # 6. Decode and Display
-    print(f"\n{'='*55}")
-    print(f"{'TOP ' + str(top_k) + ' TOKENS (Highest alignment)':^55}")
-    print(f"{'='*55}")
-    print(f"{'TOKEN':<30} | {'LOGIT SCORE':>15}")
-    print(f"{'-'*55}")
+    print(f"\n{'='*60}")
+    print(f"{'TOP ' + str(top_k) + ' TOKENS (Highest alignment)':^60}")
+    print(f"{'='*60}")
+    print(f"{'TOKEN':<35} | {'LOGIT SCORE':>15}")
+    print(f"{'-'*60}")
     
     top_labels = []
     top_scores = []
     for val, idx in zip(values, indices):
         token = tokenizer.decode([idx.item()])
-        # Escape newlines for display
-        token_display = token.replace('\n', '\\n').replace('\r', '\\r')
-        if not token_display.strip():
-            token_display = f"ID[{idx.item()}]"
-        print(f"{token_display[:30]:<30} | {val.item():15.4f}")
+        token_display = format_token_label(token, idx.item())
+        print(f"{token_display[:35]:<35} | {val.item():15.4f}")
         top_labels.append(token_display)
         top_scores.append(val.item())
 
-    print(f"\n{'='*55}")
-    print(f"{'BOTTOM ' + str(top_k) + ' TOKENS (Lowest alignment)':^55}")
-    print(f"{'='*55}")
-    print(f"{'TOKEN':<30} | {'LOGIT SCORE':>15}")
-    print(f"{'-'*55}")
+    print(f"\n{'='*60}")
+    print(f"{'BOTTOM ' + str(top_k) + ' TOKENS (Lowest alignment)':^60}")
+    print(f"{'='*60}")
+    print(f"{'TOKEN':<35} | {'LOGIT SCORE':>15}")
+    print(f"{'-'*60}")
     
     bottom_labels = []
     bottom_scores = []
     for val, idx in zip(bottom_values, bottom_indices):
         token = tokenizer.decode([idx.item()])
-        token_display = token.replace('\n', '\\n').replace('\r', '\\r')
-        if not token_display.strip():
-            token_display = f"ID[{idx.item()}]"
-        print(f"{token_display[:30]:<30} | {val.item():15.4f}")
+        token_display = format_token_label(token, idx.item())
+        print(f"{token_display[:35]:<35} | {val.item():15.4f}")
         bottom_labels.append(token_display)
         bottom_scores.append(val.item())
-    print(f"{'='*55}\n")
+    print(f"{'='*60}\n")
 
     # 7. Plotting
     print(f"📊 Generating logit lens distribution plot...")
-    plt.figure(figsize=(12, 10))
+    plt.figure(figsize=(14, 10))
     
-    # Reverse both for vertical stack: Bottoms grouped at bottom, Tops grouped at top
-    # The order will be [worst_bottom, ..., best_bottom, worst_top, ..., best_top]
+    # Interleave/Stack format: [worst_bottom...best_bottom, worst_top...best_top]
     labels = bottom_labels[::-1] + top_labels[::-1]
     scores = bottom_scores[::-1] + top_scores[::-1]
-    colors = ['#ff4444'] * top_k + ['#44bb44'] * top_k
+    # Use different colors for clarity
+    colors = ['#ff6666'] * top_k + ['#66cc66'] * top_k
     
     y_pos = range(len(labels))
-    plt.barh(y_pos, scores, color=colors, alpha=0.8)
+    plt.barh(y_pos, scores, color=colors, alpha=0.9)
     plt.yticks(y_pos, labels)
     plt.axvline(x=0, color='black', linestyle='-', linewidth=0.8)
     
+    # Derive a readable probe name and keep the ID for the filename
+    probe_name = resolved_path.stem
+    method_str = "Calibration" if "calibation_correct" in str(resolved_path) else "Not Detected"
+    layer_match = re.search(r"L(\d+)", resolved_path.name)
+    layer_str = f"Layer {layer_match.group(1)}" if layer_match else "Unknown Layer"
+    pretty_name = f"{method_str} Probe {layer_str}"
+
     plt.xlabel('Logit Alignment Score')
-    plt.title(f'Top and Bottom Token Alignment (Probe: {Path(args.probe1).name})', pad=20)
-    plt.grid(axis='x', linestyle='--', alpha=0.6)
+    plt.title(f'Logit Lens: Vocabulary Alignment for {pretty_name}', pad=25)
+    plt.axvline(x=0, color='black', linestyle='-', linewidth=0.8)
+    plt.grid(axis='x', linestyle='--', alpha=0.4)
     
     plt.tight_layout()
-    plot_path = Path("linear_probe/validation/logit_lens_distribution.png")
-    plt.savefig(plot_path)
-    print(f"✅ Plot saved to: {plot_path}")
+    # Centralized output relative to project root
+    plot_dir = PROJECT_ROOT / "plots/linear_probe/validation"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plot_path = plot_dir / f"logit_lens_{probe_name}.png"
+    
+    plt.savefig(plot_path, dpi=120)
+    print(f"✅ Success! Plot saved to: {plot_path}")
 
 if __name__ == "__main__":
     main()

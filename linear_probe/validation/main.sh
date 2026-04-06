@@ -16,3 +16,6 @@ python detection_across_prompt.py \
 
 python logit_lens.py \
     --probe1 calibation_correct_vs_detected_correct/probe_vectors/MM_L18_P0_dPrim22.88_dVal1.37.pt
+
+python logit_lens.py \
+    --probe1 not_detected_vs_detected_correct/layer_and_position_sweep/probe_vectors/MM_L26_P0_dPrim1.69_dVal1.36.pt
