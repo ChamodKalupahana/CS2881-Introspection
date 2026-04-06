@@ -10,7 +10,7 @@ echo "🚀 Starting Introspection Activation Sweep: ${RUN_NAME}"
 
 # 2. Capture Layer and Position Activations
 # We provide the explicit --run_name to avoid date skews between shell and python
-python save_activations_by_layer_and_position.py \
+python save_activations_by_layer_and_position_with_calibation.py \
     --dataset brysbaert_abstract_nouns.json \
     --layer 14 \
     --coeff 5.0 \
@@ -20,15 +20,9 @@ python save_activations_by_layer_and_position.py \
     --run_name "${RUN_NAME}" \
     --n_samples 5
 
-# 3. Analyze Mass-Mean discriminability across all layers/positions
-# This helps identify the 'best position' for steering (e.g., position 0)
-echo "📊 Running Mass-Mean Sweep..."
-python layer_and_position_sweep_mass_mean_vectors.py --run_dir "${RUN_DIR}"
-
 # 4. Perform Detailed PCA Analysis & Vector Export for the best position
 # We focus on --position 0 as it's typically the most discriminative
 echo "🔬 Running Detailed PCA & Probe Export for Position 0..."
 python compute_mass_mean_vectors_and_PCA.py \
     --run_dir "${RUN_DIR}" \
     --position 0 \
-    --top_right_only
