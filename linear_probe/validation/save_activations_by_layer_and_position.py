@@ -10,7 +10,7 @@ from collections import defaultdict
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Add project root to sys.path
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 

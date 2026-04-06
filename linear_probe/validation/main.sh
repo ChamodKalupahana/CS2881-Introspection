@@ -19,3 +19,8 @@ python logit_lens.py \
 
 python logit_lens.py \
     --probe1 not_detected_vs_detected_correct/layer_and_position_sweep/probe_vectors/MM_L26_P0_dPrim1.69_dVal1.36.pt
+
+python3 probe_2D_axis.py \
+    --run_dir saved_activations/run_04_06_26_16_32 \
+    --probe1 calibation_correct_vs_detected_correct/probe_vectors/MM_L18_P0_dPrim22.88_dVal1.37.pt \
+    --probe2 not_detected_vs_detected_correct/layer_and_position_sweep/probe_vectors/MM_L26_P0_dPrim1.69_dVal1.36.pt

@@ -15,6 +15,28 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
+def resolve_probe_path(probe_path):
+    """Try to find the probe path relative to current dir, project root, or linear_probe/."""
+    path = Path(probe_path)
+    if path.exists(): return path
+    p_root = PROJECT_ROOT / probe_path
+    if p_root.exists(): return p_root
+    p_lp = PROJECT_ROOT / "linear_probe" / probe_path
+    if p_lp.exists(): return p_lp
+    return path
+
+def resolve_run_dir(run_dir):
+    """Try to find the run directory relative to current dir or saved_activations/."""
+    path = Path(run_dir)
+    if path.exists(): return path
+    # Try in saved_activations/
+    p_sa = Path("saved_activations") / run_dir
+    if p_sa.exists(): return p_sa
+    # Try relative to project root
+    p_root_sa = PROJECT_ROOT / "linear_probe" / "validation" / "saved_activations" / run_dir
+    if p_root_sa.exists(): return p_root_sa
+    return path
+
 def extract_layer_from_filename(path):
     """
     Extracts the layer number (e.g., L14) from a filename using regex.
@@ -110,6 +132,11 @@ def get_category_tensors(activations):
     print(f"{'='*30}\n")
     return category_tensors
 
+def get_pretty_probe_name(path, layer):
+    """Derive a human-readable name from the probe path and layer."""
+    method_str = "Calibration" if "calibation_correct" in str(path) else "Not Detected"
+    return f"{method_str} Probe Layer {layer}"
+
 def main():
     parser = argparse.ArgumentParser(description="Visualize activations on a 2D axis defined by two probes.")
     parser.add_argument("--run_dir", type=str, required=True, help="Path to the saved_activations run directory.")
@@ -120,9 +147,20 @@ def main():
     parser.add_argument("--output", type=str, default=None, help="Save path for the plot.")
     args = parser.parse_args()
 
-    # 1. Resolve layers for each probe
-    layer1 = extract_layer_from_filename(args.probe1)
-    layer2 = extract_layer_from_filename(args.probe2)
+    # 1. Resolve probe paths
+    resolved_p1 = resolve_probe_path(args.probe1)
+    resolved_p2 = resolve_probe_path(args.probe2)
+    
+    if not resolved_p1.exists():
+        print(f"❌ Error: Could not find probe at {args.probe1}")
+        sys.exit(1)
+    if not resolved_p2.exists():
+        print(f"❌ Error: Could not find probe at {args.probe2}")
+        sys.exit(1)
+
+    # Resolve layers for each probe
+    layer1 = extract_layer_from_filename(resolved_p1)
+    layer2 = extract_layer_from_filename(resolved_p2)
     
     # Fallback/inheritance logic
     if layer1 is None:
@@ -136,8 +174,8 @@ def main():
         
     # 2. Load Probes
     print(f"📡 Loading probes...")
-    p1 = torch.load(args.probe1, map_location='cpu', weights_only=True).float()
-    p2 = torch.load(args.probe2, map_location='cpu', weights_only=True).float()
+    p1 = torch.load(resolved_p1, map_location='cpu', weights_only=True).float()
+    p2 = torch.load(resolved_p2, map_location='cpu', weights_only=True).float()
     
     # Ensure they are 1D vectors
     if p1.dim() > 1: p1 = p1.flatten()
@@ -147,8 +185,9 @@ def main():
     p1_unit = p1 / (torch.norm(p1) + 1e-9)
     p2_unit = p2 / (torch.norm(p2) + 1e-9)
 
-    # 3. Load activations
-    activations = load_activations(args.run_dir)
+    # 3. Resolve and Load activations
+    resolved_run_dir = resolve_run_dir(args.run_dir)
+    activations = load_activations(resolved_run_dir)
     
     # 4. Summary of loaded data
     print("\n📊 LOAD SUMMARY")
@@ -192,14 +231,14 @@ def main():
         acts2 = info["tensor"][:, l2_idx, pos_idx, :]
         
         # [num_concepts]
-        x_projs = (acts1 @ p1_unit).numpy()
-        y_projs = (acts2 @ p2_unit).numpy()
+        x_projs = (acts1.float() @ p1_unit).numpy()
+        y_projs = (acts2.float() @ p2_unit).numpy()
         
         color = category_colors.get(category, None)
         plt.scatter(x_projs, y_projs, label=category, alpha=0.6, edgecolors='none', c=color)
 
-    plt.xlabel(f"Projection onto {Path(args.probe1).name} (L{layer1})")
-    plt.ylabel(f"Projection onto {Path(args.probe2).name} (L{layer2})")
+    plt.xlabel(get_pretty_probe_name(resolved_p1, layer1))
+    plt.ylabel(get_pretty_probe_name(resolved_p2, layer2))
     plt.title(f"2D Activation Subspace (Pos {args.position})\nX: L{layer1}, Y: L{layer2}")
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.5)

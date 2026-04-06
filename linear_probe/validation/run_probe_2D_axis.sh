@@ -10,16 +10,15 @@ echo "🚀 Starting Introspection Activation Sweep: ${RUN_NAME}"
 
 # 2. Capture Layer and Position Activations
 # We provide the explicit --run_name to avoid date skews between shell and python
-python save_activations_by_layer_and_position_with_calibation.py \
+python3 save_activations_by_layer_and_position.py \
     --dataset brysbaert_abstract_nouns.json \
     --layer 14 \
     --coeff 5.0 \
     --vector_type average \
     --max_new_tokens 50 \
     --run_name "${RUN_NAME}" \
-    --n_samples 5
 
-python probe_2D_axis.py \
+python3 probe_2D_axis.py \
     --run_dir "${RUN_NAME}" \
-    --probe1  \
-    --probe2  \
+    --probe1 calibation_correct_vs_detected_correct/probe_vectors/MM_L18_P0_dPrim22.88_dVal1.37.pt \
+    --probe2 not_detected_vs_detected_correct/layer_and_position_sweep/probe_vectors/MM_L26_P0_dPrim1.69_dVal1.36.pt
