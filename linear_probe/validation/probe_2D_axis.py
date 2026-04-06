@@ -204,13 +204,15 @@ def main():
     
     plt.figure(figsize=(12, 8))
     
-    # Define colors for common categories
+    # Define curated colors for categories
     category_colors = {
-        "not_detected": "red",
-        "detected_correct": "blue",
-        "calibration_correct": "green",
-        "detected_parallel": "cyan",
-        "detected_orthogonal": "orange"
+        "not_detected": "#EF4444",        # Vibrant Red
+        "detected_parallel": "#00008B",     # Darker Blue (Requested Change)
+        "calibration_correct": "#10B981",  # Vibrant Green
+        "detected_correct": "#14B8A6",    # Teal/Cyan
+        "detected_orthogonal": "#8B5CF6",  # Vibrant Purple
+        "detected_unknown": "#FFC0CB",     # Slate/Grey
+        "incoherent": "#F59E0B"            # Amber/Orange
     }
 
     for category, info in category_info.items():
@@ -239,6 +241,8 @@ def main():
 
     plt.xlabel(get_pretty_probe_name(resolved_p1, layer1))
     plt.ylabel(get_pretty_probe_name(resolved_p2, layer2))
+    plt.axvline(x=0, color='black', linestyle='-', linewidth=1.0, alpha=0.3)
+    plt.axhline(y=0, color='black', linestyle='-', linewidth=1.0, alpha=0.3)
     plt.title(f"2D Activation Subspace (Pos {args.position})\nX: L{layer1}, Y: L{layer2}")
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.5)
