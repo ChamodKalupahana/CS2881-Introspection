@@ -30,3 +30,7 @@ else
     echo "❌ Error: final_evaluation_summary.csv not found in the latest run directory."
     exit 1
 fi
+
+python plot_results.py \
+    --csv_path full_probe_evaluation/run_04_06_26_11_56/final_evaluation_summary.csv \
+    --prompt Anthropic

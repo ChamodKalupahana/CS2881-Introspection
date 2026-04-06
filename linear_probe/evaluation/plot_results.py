@@ -3,11 +3,66 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import argparse
 import sys
+import re
 from pathlib import Path
 
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# Metadata for probe categorization
+METHOD_SCAN_DIRS = {
+    "calibration": PROJECT_ROOT / "linear_probe/calibation_correct_vs_detected_correct/probe_vectors",
+    "not_detected": PROJECT_ROOT / "linear_probe/not_detected_vs_detected_correct/layer_and_position_sweep/probe_vectors"
+}
+
+def get_probe_method_mapping():
+    """Builds a mapping of {probe_filename: method_label} by scanning project directories."""
+    mapping = {}
+    for method, dir_path in METHOD_SCAN_DIRS.items():
+        if not dir_path.exists():
+            print(f"⚠️  Warning: Method directory skip (not found): {dir_path}")
+            continue
+        for f in dir_path.glob("*.pt"):
+            mapping[f.name] = method
+    return mapping
+
+def enrich_data(df):
+    """Enriches the probe data with method categorization and formatted display names."""
+    mapping = get_probe_method_mapping()
+    
+    # 1. Map Method
+    # Look for the filename match in our scanned mapping
+    df['Method'] = df['Probe'].apply(lambda x: mapping.get(x, "unknown"))
+    
+    # 2. Extract Layer Number (Lxx) for sorting
+    def extract_layer(name):
+        match = re.search(r"L(\d+)", name)
+        return int(match.group(1)) if match else 0
+    df['Layer_Num'] = df['Probe'].apply(extract_layer)
+    
+    # 3. Create Display Name
+    # E.g. [CAL] L18_P0 or [ND] L24_P0
+    method_abbr = {"calibration": "CAL", "not_detected": "ND", "unknown": "???"}
+    
+    def format_display_name(row):
+        m = method_abbr.get(row['Method'], row['Method'][:3].upper())
+        # Strip redundant "MM_" and ".pt" for a cleaner title
+        clean_name = row['Probe'].replace("MM_", "").replace(".pt", "")
+        # Keep essential metadata but make it easier to read
+        return f"[{m}] {clean_name}"
+    
+    df['Display_Name'] = df.apply(format_display_name, axis=1)
+    
+    # 4. Global Sorting Strategy: Method (CAL first) then Layer
+    # This ensures the 2x5 grid is logically grouped by training approach.
+    df = df.sort_values(by=['Method', 'Layer_Num'], ascending=[True, True])
+    
+    return df
+
 def main():
-    parser = argparse.ArgumentParser(description="Plot aggregated linear probe evaluation results from a CSV summary.")
+    parser = argparse.ArgumentParser(description="Plot aggregated linear probe evaluation results with method categorization.")
     parser.add_argument("--csv_path", type=str, required=True, help="Path to final_evaluation_summary.csv")
+    parser.add_argument("--prompt", type=str, default=None, help="Filter for a specific prompt type (e.g., Anthropic)")
     args = parser.parse_args()
 
     # 1. Load Data
@@ -20,61 +75,83 @@ def main():
     df = pd.read_csv(csv_path)
     df = df.dropna(subset=['Probe', 'Coeff'])
     
-    # 2. Cleanup & Processing
-    # Ensure numeric types
+    # Optional Filtering
+    if args.prompt:
+        print(f"🔍 Filtering for prompt type: {args.prompt}")
+        df = df[df['Prompt'] == args.prompt]
+        if df.empty:
+            print(f"❌ Error: No data found for prompt '{args.prompt}'")
+            sys.exit(1)
+    
+    # 2. Dynamic Enrichment
+    # Discover which method each probe used based on its directory source
+    df = enrich_data(df)
+    
+    # 3. Cleanup & Processing
     df['Coeff'] = pd.to_numeric(df['Coeff'], errors='coerce')
     df['Steer_Rate'] = pd.to_numeric(df['Steer_Rate'], errors='coerce')
     df['FPR_Rate'] = pd.to_numeric(df['FPR_Rate'], errors='coerce')
     
     # Melt for dual-line plotting (Steer_Rate vs FPR_Rate)
     df_melted = df.melt(
-        id_vars=['Probe', 'Prompt', 'Layer', 'Coeff'], 
+        id_vars=['Probe', 'Display_Name', 'Method', 'Layer_Num', 'Prompt', 'Layer', 'Coeff'], 
         value_vars=['Steer_Rate', 'FPR_Rate'],
         var_name='Metric', 
         value_name='Percentage'
     )
     
-    # 3. Optimized Visualization logic (2x5 Grid)
-    print(f"📈 Generating 2x5 wrapped grid plots...")
+    # 4. Plotting (5x2 Grid grouped by Training Method)
+    print(f"📈 Generating 5x2 grid (Grouped by training approach)...")
     sns.set_theme(style="whitegrid")
     
-    # Using col_wrap=5 to force a 2x5 grid if there are 10 probes
+    # Interleave logic to get CAL on left, ND on right
+    cal_probes = df[df['Method'] == 'calibration']['Display_Name'].unique().tolist()
+    nd_probes = df[df['Method'] == 'not_detected']['Display_Name'].unique().tolist()
+    
+    # Interleave the lists
+    interleaved_order = []
+    max_len = max(len(cal_probes), len(nd_probes))
+    for i in range(max_len):
+        if i < len(cal_probes): interleaved_order.append(cal_probes[i])
+        if i < len(nd_probes): interleaved_order.append(nd_probes[i])
+    
     g = sns.FacetGrid(
         df_melted, 
-        col='Probe', 
-        col_wrap=5,
+        col='Display_Name', 
+        col_order=interleaved_order,
+        col_wrap=2,
         hue='Metric',
-        height=3.5, 
-        aspect=1.2,
+        height=3.8, 
+        aspect=2.0,
         palette={'Steer_Rate': '#44bb44', 'FPR_Rate': '#ff4444'},
         sharex=True,
         sharey=True
     )
     
-    # Plot lineplots. 
+    # Plot lineplots
     g.map(sns.lineplot, 'Coeff', 'Percentage', marker='o', markersize=5, alpha=0.9, errorbar='se')
     
     # Formatting
     g.set_axis_labels("Coeff", "Rate (%)")
     g.set_titles(col_template="{col_name}")
     
-    # Core reference lines
+    # Baseline indicators
     g.map(plt.axhline, y=0, color='gray', linestyle='--', alpha=0.4)
     g.map(plt.axhline, y=100, color='gray', linestyle='--', alpha=0.4)
     g.map(plt.axvline, x=0, color='black', alpha=0.2, linestyle='-')
     
     # Legend
-    g.add_legend(title="Performance Category")
+    g.add_legend(title="Metric")
     
     # Layout and Title
-    plt.subplots_adjust(top=0.9, hspace=0.35, wspace=0.1)
-    g.fig.suptitle(f"Linear Probe Performance Comparison (Wrapped Summary) | Run: {csv_path.parent.name}", fontsize=20, y=1.02)
+    plt.subplots_adjust(top=0.9, hspace=0.4, wspace=0.1)
+    prompt_tag = f"({args.prompt})" if args.prompt else "Aggregated Across Prompts"
+    g.fig.suptitle(f"Linear Probe Performance {prompt_tag} | Grouped by: Method\nRun: {csv_path.parent.name}", fontsize=20, y=1.02)
     
-    # 4. Save
+    # 5. Save
     output_path = csv_path.parent / "evaluation_plot_aggregated.png"
-    # bbox_inches='tight' is critical here as titles can be long
     plt.savefig(output_path, dpi=140, bbox_inches='tight')
-    print(f"✅ Success! Aggregated grid plot saved to: {output_path}")
+    print(f"✅ Success! Method-labeled 2x5 grid saved to: {output_path}")
 
 if __name__ == "__main__":
     main()
