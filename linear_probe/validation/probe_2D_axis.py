@@ -148,8 +148,8 @@ def main():
     args = parser.parse_args()
 
     # 1. Resolve probe paths
-    resolved_p1 = resolve_probe_path(args.probe1)
-    resolved_p2 = resolve_probe_path(args.probe2)
+    resolved_p1 = resolve_probe_path(args.probe2)
+    resolved_p2 = resolve_probe_path(args.probe1)
     
     if not resolved_p1.exists():
         print(f"❌ Error: Could not find probe at {args.probe1}")
