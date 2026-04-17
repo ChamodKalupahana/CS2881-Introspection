@@ -66,7 +66,8 @@ def load_and_group_configs(master_config_path: Path) -> Dict[Tuple[str, str], Li
 
 def distribute_configs_to_gpus(
     grouped_configs: Dict[Tuple[str, str], List[dict]], 
-    n_gpus: int
+    n_gpus: int,
+    gpus_per_model: int = 1
 ) -> List[Tuple[int, List[dict], str]]:
     """
     Distribute configs across GPUs.
@@ -74,12 +75,13 @@ def distribute_configs_to_gpus(
     If fewer groups than GPUs, spread groups across multiple GPUs.
     Returns list of (gpu_id, configs, description) tuples.
     """
+    n_slots = n_gpus // gpus_per_model
     n_groups = len(grouped_configs)
     
-    if n_groups > n_gpus:
+    if n_groups > n_slots:
         raise ValueError(
-            f"Error: {n_groups} (model, lora) groups found but only {n_gpus} GPUs available. "
-            f"Cannot assign more than one model/lora combination to a GPU."
+            f"Error: {n_groups} (model, lora) groups found but only {n_slots} slots available ({n_gpus} GPUs, {gpus_per_model} per model). "
+            f"Cannot assign more than one model/lora combination to a slot."
         )
     
     # Sort groups for consistent assignment (by model name, then lora name)
@@ -87,56 +89,48 @@ def distribute_configs_to_gpus(
     
     distributions = []
     
-    if n_groups == n_gpus:
-        # One group per GPU
-        for gpu_id, ((model, lora), configs) in enumerate(sorted_groups):
+    # Distribution logic based on slots
+    if n_groups == n_slots:
+        # One group per slot
+        for slot_id, ((model, lora), configs) in enumerate(sorted_groups):
             desc = f"model={model}, lora={lora}"
-            distributions.append((gpu_id, configs, desc))
+            distributions.append((slot_id, configs, desc))
     
     else:
-        # Fewer groups than GPUs - distribute GPUs across groups based on config count
+        # Fewer groups than slots - distribute slots across groups based on config count
         total_configs = sum(len(configs) for _, configs in sorted_groups)
         
-        # Calculate how many GPUs each group should get based on config count
-        gpu_assignments = []
-        gpus_assigned = 0
+        slot_assignments = []
+        slots_assigned = 0
         
         for i, ((model, lora), configs) in enumerate(sorted_groups):
             config_ratio = len(configs) / total_configs
             
             if i == len(sorted_groups) - 1:
-                # Last group gets remaining GPUs
-                gpus_for_group = n_gpus - gpus_assigned
+                slots_for_group = n_slots - slots_assigned
             else:
-                # Assign GPUs proportional to config count, with minimum of 1
-                gpus_for_group = max(1, round(config_ratio * n_gpus))
-                # Don't assign more GPUs than we have left
-                gpus_for_group = min(gpus_for_group, n_gpus - gpus_assigned)
+                slots_for_group = max(1, round(config_ratio * n_slots))
+                slots_for_group = min(slots_for_group, n_slots - slots_assigned)
             
-            gpu_assignments.append(((model, lora), configs, gpus_for_group))
-            gpus_assigned += gpus_for_group
+            slot_assignments.append(((model, lora), configs, slots_for_group))
+            slots_assigned += slots_for_group
         
-        # Now distribute configs within each group across its assigned GPUs
-        current_gpu_id = 0
-        
-        for (model, lora), configs, gpus_for_group in gpu_assignments:
-            configs_per_gpu = len(configs) // gpus_for_group
-            remainder = len(configs) % gpus_for_group
+        current_slot_id = 0
+        for (model, lora), configs, slots_for_group in slot_assignments:
+            configs_per_slot = len(configs) // slots_for_group
+            remainder = len(configs) % slots_for_group
             
             start_idx = 0
-            for i in range(gpus_for_group):
-                # Calculate how many configs this GPU gets
-                n_configs_for_gpu = configs_per_gpu + (1 if i < remainder else 0)
-                end_idx = start_idx + n_configs_for_gpu
-                
-                # Get configs for this GPU
+            for i in range(slots_for_group):
+                n_configs_for_slot = configs_per_slot + (1 if i < remainder else 0)
+                end_idx = start_idx + n_configs_for_slot
                 gpu_configs = configs[start_idx:end_idx]
                 
                 if gpu_configs:
                     desc = f"model={model}, lora={lora}"
-                    distributions.append((current_gpu_id, gpu_configs, desc))
+                    distributions.append((current_slot_id, gpu_configs, desc))
                 
-                current_gpu_id += 1
+                current_slot_id += 1
                 start_idx = end_idx
     
     return distributions
@@ -213,14 +207,21 @@ def print_batch_summary(batch_info: List[Tuple[int, int, Path, str]], distributi
     print("="*80 + "\n")
 
 
-def launch_experiment(gpu_id: int, config_file: Path, experiment_name: str, batch_number: int) -> subprocess.Popen:
-    """Launch a single experiment on a specific GPU."""
+def launch_experiment(
+    gpu_ids: List[int], 
+    config_file: Path, 
+    experiment_name: str, 
+    batch_number: int,
+    load_in_4bit: bool = False,
+    load_in_8bit: bool = False
+) -> subprocess.Popen:
+    """Launch a single experiment on specific GPU(s)."""
     
     script = project_root / "src" / "steering_experiments" / "run_configs.py"
     
     # Set up environment with CUDA_VISIBLE_DEVICES
     env = os.environ.copy()
-    env['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
+    env['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, gpu_ids))
     
     # Launch the process
     cmd = [
@@ -231,7 +232,12 @@ def launch_experiment(gpu_id: int, config_file: Path, experiment_name: str, batc
         '--batch_number', str(batch_number)
     ]
     
-    print(f"Launching Batch {batch_number} on GPU {gpu_id}")
+    if load_in_4bit:
+        cmd.append('--load_in_4bit')
+    if load_in_8bit:
+        cmd.append('--load_in_8bit')
+    
+    print(f"Launching Batch {batch_number} on GPU(s) {gpu_ids}")
     print(f"  Command: {' '.join(cmd)}")
     
     process = subprocess.Popen(
@@ -247,16 +253,17 @@ def launch_experiment(gpu_id: int, config_file: Path, experiment_name: str, batc
     return process
 
 
-def monitor_processes(processes: Dict[int, Tuple[subprocess.Popen, int, Path]], experiment_name: str):
+def monitor_processes(processes: Dict[int, Tuple[subprocess.Popen, List[int], Path]], experiment_name: str):
     """
     Monitor running processes and print their output.
-    processes: dict mapping batch_number to (process, gpu_id, config_path)
+    processes: dict mapping batch_number to (process, gpu_ids, config_path)
     """
     
     # Open log files for each batch
     log_files = {}
-    for batch_num, (process, gpu_id, config_path) in processes.items():
-        log_file = config_path.parent / f"gpu_{gpu_id}_console.log"
+    for batch_num, (process, gpu_ids, config_path) in processes.items():
+        # Use first GPU in list for log filename
+        log_file = config_path.parent / f"gpu_{gpu_ids[0]}_console.log"
         log_files[batch_num] = open(log_file, 'w')
     
     # Track completed processes
@@ -266,7 +273,7 @@ def monitor_processes(processes: Dict[int, Tuple[subprocess.Popen, int, Path]], 
     # Monitor until all processes complete
     try:
         while len(completed) < len(processes):
-            for batch_num, (process, gpu_id, _) in processes.items():
+            for batch_num, (process, gpu_ids, _) in processes.items():
                 if batch_num in completed:
                     continue
                     
@@ -282,7 +289,7 @@ def monitor_processes(processes: Dict[int, Tuple[subprocess.Popen, int, Path]], 
                             log_files[batch_num].write(line)
                             log_files[batch_num].flush()
                             # Also print to console with batch/GPU prefix
-                            print(f"[Batch {batch_num}/GPU {gpu_id}] {line.rstrip()}")
+                            print(f"[Batch {batch_num}/GPU(s) {gpu_ids}] {line.rstrip()}")
                     except:
                         pass
                 else:
@@ -293,14 +300,14 @@ def monitor_processes(processes: Dict[int, Tuple[subprocess.Popen, int, Path]], 
                     remaining_output, _ = process.communicate()
                     if remaining_output:
                         log_files[batch_num].write(remaining_output)
-                        print(f"[Batch {batch_num}/GPU {gpu_id}] {remaining_output}")
+                        print(f"[Batch {batch_num}/GPU(s) {gpu_ids}] {remaining_output}")
                     
                     # Check return code
                     if poll_result != 0:
                         failed.add(batch_num)
-                        print(f"\n[Batch {batch_num}/GPU {gpu_id}] Process failed with code {poll_result}")
+                        print(f"\n[Batch {batch_num}/GPU(s) {gpu_ids}] Process failed with code {poll_result}")
                     else:
-                        print(f"\n[Batch {batch_num}/GPU {gpu_id}] Process completed successfully")
+                        print(f"\n[Batch {batch_num}/GPU(s) {gpu_ids}] Process completed successfully")
             
             time.sleep(0.1)  # Small delay to prevent busy waiting
     
@@ -561,6 +568,22 @@ def main():
         action="store_true",
         help="Print the configs without actually running the experiments"
     )
+    parser.add_argument(
+        "--gpus_per_model",
+        type=int,
+        default=1,
+        help="Number of GPUs to assign to each model instance (for model parallelism)"
+    )
+    parser.add_argument(
+        "--load_in_4bit",
+        action="store_true",
+        help="Load model in 4-bit quantization"
+    )
+    parser.add_argument(
+        "--load_in_8bit",
+        action="store_true",
+        help="Load model in 8-bit quantization"
+    )
 
     args = parser.parse_args()
     
@@ -616,9 +639,9 @@ def main():
         sys.exit(0)
 
     # Distribute configs to GPUs
-    print(f"\nDistributing configs across {n_gpus} GPUs...")
+    print(f"\nDistributing configs across {n_gpus} GPUs (assigning {args.gpus_per_model} GPUs per model instance)...")
     try:
-        distributions = distribute_configs_to_gpus(grouped_configs, n_gpus)
+        distributions = distribute_configs_to_gpus(grouped_configs, n_gpus, args.gpus_per_model)
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)
@@ -632,12 +655,23 @@ def main():
     
     # Launch all processes
     processes = {}
-    for batch_num, gpu_id, config_path, desc in batch_info:
-        # Map to actual GPU ID if specific GPUs were provided
-        actual_gpu_id = gpu_ids[gpu_id] if args.gpus else gpu_id
+    for batch_num, slot_id, config_path, desc in batch_info:
+        # Map slot_id to actual GPU IDs
+        start_gpu_idx = slot_id * args.gpus_per_model
+        end_gpu_idx = start_gpu_idx + args.gpus_per_model
         
-        process = launch_experiment(actual_gpu_id, config_path, args.experiment_name, batch_num)
-        processes[batch_num] = (process, actual_gpu_id, config_path)
+        # Get the actual IDs from the gpu_ids list
+        current_slot_gpu_ids = gpu_ids[start_gpu_idx:end_gpu_idx]
+        
+        process = launch_experiment(
+            current_slot_gpu_ids, 
+            config_path, 
+            args.experiment_name, 
+            batch_num,
+            load_in_4bit=args.load_in_4bit,
+            load_in_8bit=args.load_in_8bit
+        )
+        processes[batch_num] = (process, current_slot_gpu_ids, config_path)
         time.sleep(2)  # Small delay between launches
     
     print(f"\nLaunched {len(processes)} batch processes")

@@ -827,6 +827,12 @@ async def main():
     parser.add_argument(
         "--batch_number", type=int, required=True, help="Batch number for which part of the json file we got"
     )
+    parser.add_argument(
+        "--load_in_4bit", action="store_true", help="Load model in 4-bit quantization"
+    )
+    parser.add_argument(
+        "--load_in_8bit", action="store_true", help="Load model in 8-bit quantization"
+    )
     args = parser.parse_args()
 
     log_dir = Path(project_root / "logs" / args.experiment_name / f"batch_{args.batch_number}")
@@ -852,8 +858,12 @@ async def main():
     model_kwargs = {
         "torch_dtype": t.bfloat16,
         "trust_remote_code": True,
-        "device_map": "cuda",
+        "device_map": "auto",
     }
+    if args.load_in_4bit:
+        model_kwargs["load_in_4bit"] = True
+    elif args.load_in_8bit:
+        model_kwargs["load_in_8bit"] = True
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     tokenizer.pad_token_id = tokenizer.eos_token_id
     tokenizer.padding_side = "left"

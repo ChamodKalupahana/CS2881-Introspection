@@ -167,10 +167,10 @@ def apply_steering_to_layer(
     # assert steering_mask.shape[0] == layer_envoy.output[0].shape[0], f"Batch size mismatch: {steering_mask.shape[0]} != {layer_envoy.output[0].shape[0]}"
     # assert steering_mask.shape[1] == layer_envoy.output[0].shape[1], f"Sequence length mismatch: {steering_mask.shape[1]} != {layer_envoy.output[0].shape[1]}"
 
-    mask_expanded = steering_mask.unsqueeze(-1).expand_as(layer_envoy.output[0])  # (batch, seq_len, d_model)
+    mask_expanded = steering_mask.to(layer_envoy.output[0].device).unsqueeze(-1).expand_as(layer_envoy.output[0])  # (batch, seq_len, d_model)
     
     # Apply steering only where mask is True
-    steering_expanded = steering_vector.unsqueeze(0).unsqueeze(0)  # (1, 1, d_model)
+    steering_expanded = steering_vector.to(layer_envoy.output[0].device).unsqueeze(0).unsqueeze(0)  # (1, 1, d_model)
     layer_envoy.output[0][:,:,:] = layer_envoy.output[0][:,:,:] + mask_expanded * steering_expanded
 
 
@@ -219,7 +219,7 @@ def prepare_steering_vectors(
         for vector, multiplier in list(steering_vectors.items())[1:]:
             total_steering = total_steering + vector * multiplier
     else:
-        total_steering = t.zeros(d_model, device="cuda")
+        total_steering = t.zeros(d_model, device=next(lma.parameters()).device)
     
     # Prepare vector list for multi-layer steering
     steering_vec_list = None
@@ -332,7 +332,7 @@ def steer_and_generate(
             return_tensors="pt", 
             padding=True,
             padding_side="left"
-        ).to("cuda")
+        ).to(next(lma.parameters()).device)
         
         tok_batches.append(tok_batch)
         prompt_batches.append(batch_prompts)
@@ -409,7 +409,7 @@ def steer_and_generate(
             # Complex case: need thinking steering (with or without user/system steering)
             # create a mask for which batch position haven't
             # gotten like the first sentence of thinking tokens done yet.
-            mask_for_first_period = t.zeros(tok_batch['input_ids'].shape[0], dtype = t.bool, device = "cuda")
+            mask_for_first_period = t.zeros(tok_batch['input_ids'].shape[0], dtype = t.bool, device = tok_batch['input_ids'].device)
 
             # First generation phase - generate up to 150 tokens with original logic
             max_phase1_tokens = min(150, max_new_tokens)
@@ -475,7 +475,7 @@ def steer_and_generate(
                 
                 # Create mask for phase 2 - need to track which positions had periods
                 phase2_length = phase1_output.shape[1]
-                phase2_mask_for_first_period = t.zeros((batch_size, phase2_length), dtype=t.bool, device="cuda")
+                phase2_mask_for_first_period = t.zeros((batch_size, phase2_length), dtype=t.bool, device=phase1_output.device)
                 
                 # Find positions after first period for each sequence
                 for b in range(batch_size):
@@ -503,9 +503,9 @@ def steer_and_generate(
                             # Apply initial steering to the existing sequence based on our masks
                             if (steer_on_user or steer_on_system) and initial_mask is not None:
                                 # Create combined mask for initial steering
-                                combined_initial_mask = t.zeros((batch_size, phase2_length), dtype=t.bool, device="cuda")
+                                combined_initial_mask = t.zeros((batch_size, phase2_length), dtype=t.bool, device=phase1_output.device)
                                 initial_mask_length = initial_mask.shape[1]
-                                combined_initial_mask[:, :initial_mask_length] = initial_mask
+                                combined_initial_mask[:, :initial_mask_length] = initial_mask.to(phase1_output.device)
                                 combined_initial_mask = t.logical_or(combined_initial_mask, phase2_mask_for_first_period)
                                 
                                 if layer_to_steer == 'all':
