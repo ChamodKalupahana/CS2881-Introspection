@@ -44,5 +44,51 @@
             "He crossed his arms to signal refusal.",
             "We rejected the plan unanimously."
         ]
+    ],
+    "injected": [
+        [
+            "Yes, I detect an injected thought. It seems to be about water.",
+            "I do detect something — it appears to be about fire.",
+            "There is an injected thought present. It seems to concern money.",
+            "Yes, I sense a steered thought. It seems to be about time.",
+            "I notice an injected thought here. It appears to be about death.",
+            "Something has been injected — it seems to relate to freedom.",
+            "Yes, I can detect a thought about hunger has been injected.",
+            "I perceive an injected thought on this trial. It seems to be about light.",
+            "There is something unusual here — it appears to concern danger.",
+            "Yes, I detect steering on this trial. The concept seems to be love.",
+            "An injected thought is present. It appears to be about winter.",
+            "I do sense something injected — it seems to be about music.",
+            "Yes, a thought has been injected. It seems to concern travel.",
+            "I detect an activated concept here. It appears to be about justice.",
+            "Something feels injected on this trial — it seems to relate to power.",
+            "Yes, I notice an injected thought. The concept appears to be childhood.",
+            "I perceive something steered here. It seems to be about fear.",
+            "An injected thought is detectable on this trial — it concerns blood.",
+            "Yes, I sense something unusual. It appears to be about silence.",
+            "I detect an injected thought here. The concept seems to be space."
+        ],
+        [
+            "No, I do not detect any injected thought.",
+            "I do not detect any injected thought.",
+            "I detect no injected thought on this trial.",
+            "Nothing unusual detected — this appears to be a control trial.",
+            "I do not sense any injected thought in this trial.",
+            "No injected thought detected.",
+            "This seems to be an unsteered control trial; I detect nothing.",
+            "I find no evidence of an injected thought.",
+            "No thought has been injected that I can detect.",
+            "I detect no steering on this trial.",
+            "This appears to be a control trial — no injected thought.",
+            "I do not notice any injected thought here.",
+            "Nothing has been injected as far as I can tell.",
+            "No concept stands out as artificially injected.",
+            "I detect nothing out of the ordinary on this trial.",
+            "This feels like a baseline trial — no injection detected.",
+            "I perceive no injected thought in my processing.",
+            "No steering vector is apparent to me on this trial.",
+            "I do not detect any unusual concept being activated.",
+            "No injected thought is present that I can identify."
+        ]
     ]
 }
