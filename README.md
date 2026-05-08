@@ -114,7 +114,6 @@ python original_paper/main.py --experiment mcq --model llama-3.1-8b
 ---
 
 ## 🏗️ Future Directions
-- **Stateful Evaluation**: Transitioning to the `inspect_ai` framework for robust, multi-turn stateful evaluations.
 - **Endogenous Steering Resistance (ESR)**: Investigating how models resist external concept steering.
 
 ---
