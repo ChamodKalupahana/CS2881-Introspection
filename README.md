@@ -1,5 +1,4 @@
-# Introspection: Understanding and Steering LLM Internal States
-
+# Probing and Steering Introspection
 ![Project Banner](https://img.shields.io/badge/Research-AI_Safety_&_Interpretability-blueviolet?style=for-the-badge)
 ![Python Version](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
 ![Framework](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
